@@ -3,14 +3,120 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BenchFirst · slow React pages</title>
+    <title>California DMV · Online Services</title>
     <style>
-      body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 16px; }
-      h2 { font-size: 15px; margin: 0 0 8px; }
-      .list { max-height: 70vh; overflow: auto; border: 1px solid #ddd; }
-      .row { padding: 2px 8px; font-size: 12px; border-bottom: 1px solid #f2f2f2; }
-      .row.hi { background: #ffe08a; font-weight: 600; }
-      button { margin-bottom: 8px; }
+      /* Deliberately plain, dated, government-website styling. No UI library. */
+      body {
+        font-family: Arial, Helvetica, "Liberation Sans", sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #eef1f4;
+        color: #1a1a1a;
+      }
+
+      /* --- State of California header bar --- */
+      .dmv-header {
+        background: #003466;
+        border-bottom: 4px solid #ffb819;
+        padding: 12px 16px;
+      }
+      .dmv-header-text {
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: bold;
+        letter-spacing: 0.3px;
+      }
+
+      .dmv-body { padding: 16px; max-width: 960px; }
+      .dmv-title {
+        font-size: 22px;
+        color: #003466;
+        margin: 12px 0 14px;
+        border-bottom: 1px solid #c7ccd1;
+        padding-bottom: 6px;
+      }
+
+      /* --- Filter row: two dropdowns + one text input --- */
+      .dmv-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        background: #dfe4ea;
+        border: 1px solid #b6bcc4;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+      }
+      .dmv-field { display: flex; flex-direction: column; font-size: 12px; }
+      .dmv-field-label { color: #003466; font-weight: bold; margin-bottom: 3px; }
+      .dmv-field select,
+      .dmv-field input {
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        padding: 4px 6px;
+        border: 1px solid #7d8894;
+        background: #ffffff;
+        min-width: 160px;
+      }
+      .dmv-field-text input { min-width: 200px; }
+
+      .dmv-meta { font-size: 12px; color: #444; margin-bottom: 8px; }
+
+      /* --- The scrollable results list --- */
+      .list {
+        max-height: 62vh;
+        overflow: auto;
+        border: 1px solid #b6bcc4;
+        background: #ffffff;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 5px 8px;
+        font-size: 12px;
+        border-bottom: 1px solid #edf0f2;
+      }
+      .row.hi { background: #fff2cc; font-weight: bold; }
+      .cell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .cell-name, .cell-office { flex: 2; min-width: 180px; color: #003466; }
+      .cell-addr { flex: 2; min-width: 160px; color: #333; }
+      .cell-city, .cell-date, .cell-service { flex: 1; min-width: 110px; }
+      .cell-dist, .cell-time { flex: 0 0 70px; text-align: right; color: #555; }
+
+      /* --- Wait-time badge (traffic-light, government-ugly) --- */
+      .badge {
+        flex: 0 0 auto;
+        font-size: 11px;
+        font-weight: bold;
+        padding: 2px 6px;
+        border: 1px solid #00000022;
+        border-radius: 2px;
+        color: #ffffff;
+      }
+      .wait-ok   { background: #2e7d32; }
+      .wait-warn { background: #b8860b; }
+      .wait-bad  { background: #b22222; }
+
+      /* --- Page B appointment hero (holds the inline SVG calendar) --- */
+      .dmv-hero {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 16px 0;
+      }
+      .dmv-hero-text { font-size: 13px; color: #333; max-width: 480px; }
+      .dmv-cal { flex: 0 0 auto; }
+
+      button {
+        margin-bottom: 8px;
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        padding: 4px 10px;
+        background: #003466;
+        color: #fff;
+        border: 1px solid #002347;
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
