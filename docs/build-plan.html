@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<title>BenchFirst — build plan</title>
+<style>
+  :root{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f7f9fb; --ink:#141b24; --muted:#5c6b7a; --line:#dde4ec;
+    --isha:#1f6feb; --isha-soft:rgba(31,111,235,.12);
+    --dev:#b9820f; --dev-soft:rgba(201,138,18,.14);
+    --rev:#7c5cff; --rev-soft:rgba(124,92,255,.12);
+    --done:#2f9e5f; --done-soft:rgba(47,158,95,.14);
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --radius:12px; --shadow:0 1px 2px rgba(16,26,40,.06),0 6px 18px rgba(16,26,40,.05);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0d1117; --surface:#161d27; --surface-2:#1b2430; --ink:#e7eef6; --muted:#8b98a8; --line:#27313d;
+      --isha:#4c96ff; --isha-soft:rgba(76,150,255,.15);
+      --dev:#e6b23c; --dev-soft:rgba(230,178,60,.15);
+      --rev:#a48bff; --rev-soft:rgba(164,139,255,.15);
+      --done:#43c07b; --done-soft:rgba(67,192,123,.15);
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f7f9fb; --ink:#141b24; --muted:#5c6b7a; --line:#dde4ec;
+    --isha:#1f6feb; --isha-soft:rgba(31,111,235,.12);
+    --dev:#b9820f; --dev-soft:rgba(201,138,18,.14);
+    --rev:#7c5cff; --rev-soft:rgba(124,92,255,.12);
+    --done:#2f9e5f; --done-soft:rgba(47,158,95,.14);
+    --shadow:0 1px 2px rgba(16,26,40,.06),0 6px 18px rgba(16,26,40,.05);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1117; --surface:#161d27; --surface-2:#1b2430; --ink:#e7eef6; --muted:#8b98a8; --line:#27313d;
+    --isha:#4c96ff; --isha-soft:rgba(76,150,255,.15);
+    --dev:#e6b23c; --dev-soft:rgba(230,178,60,.15);
+    --rev:#a48bff; --rev-soft:rgba(164,139,255,.15);
+    --done:#43c07b; --done-soft:rgba(67,192,123,.15);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.28);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;
+    -webkit-font-smoothing:antialiased;padding:28px 18px 80px}
+  .wrap{max-width:1060px;margin:0 auto}
+  a{color:inherit}
+
+  header.top{margin-bottom:22px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  h1{font-size:clamp(24px,3.4vw,34px);line-height:1.1;margin:6px 0 4px;text-wrap:balance;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:14.5px;max-width:60ch}
+
+  .summary{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+  .metric{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;box-shadow:var(--shadow)}
+  .metric .lane{display:flex;align-items:center;gap:8px;font-weight:650;font-size:13.5px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .metric .stat{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:7px;display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}
+  .bar{height:6px;border-radius:6px;background:var(--surface-2);overflow:hidden;margin-top:8px;border:1px solid var(--line)}
+  .bar i{display:block;height:100%;width:0;border-radius:6px;transition:width .35s ease}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:20px 0 8px}
+  button{font-family:inherit;cursor:pointer;border-radius:9px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink);font-size:13px;padding:8px 13px;transition:background .15s,border-color .15s,transform .05s}
+  button:hover{background:var(--surface-2)}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+  button.primary:hover{opacity:.9;background:var(--ink)}
+  button:focus-visible,[tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--isha);outline-offset:2px}
+  .toolbar .spacer{flex:1}
+  .toolbar .hint{font-size:12px;color:var(--muted)}
+
+  /* timeline */
+  .phase{margin-top:20px}
+  .phaserow{display:flex;align-items:baseline;gap:12px;margin:0 2px 10px}
+  .clock{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .phasename{font-weight:680;font-size:15px;letter-spacing:-.01em}
+  .phaseline{flex:1;height:1px;background:var(--line)}
+
+  .lanes{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .lane-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .lane-head{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-left:2px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-left-width:3px;border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden}
+  .card.dev{border-left-color:var(--dev)}
+  .card.isha{border-left-color:var(--isha)}
+  .card-main{display:flex;align-items:flex-start;gap:11px;padding:12px 13px;cursor:pointer}
+  .chk{appearance:none;flex:none;width:19px;height:19px;margin-top:1px;border:1.8px solid var(--line);border-radius:6px;
+    background:var(--surface-2);cursor:pointer;position:relative;transition:background .15s,border-color .15s}
+  .chk:hover{border-color:var(--muted)}
+  .chk:checked{background:var(--done);border-color:var(--done)}
+  .chk:checked::after{content:"";position:absolute;left:5.5px;top:2px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
+  .card-body{flex:1;min-width:0}
+  .ttl{font-size:14px;font-weight:600;letter-spacing:-.005em}
+  .card.done .ttl{text-decoration:line-through;color:var(--muted);text-decoration-thickness:1.5px}
+  .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
+  .pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.02em;padding:2px 7px;border-radius:20px;
+    background:var(--surface-2);border:1px solid var(--line);color:var(--muted);font-variant-numeric:tabular-nums}
+  .pill.est{color:var(--ink)}
+  .pill.creds{background:var(--dev-soft);border-color:transparent;color:var(--dev)}
+  .pill.file{font-size:10px}
+  .chev{flex:none;color:var(--muted);transition:transform .2s;margin-top:2px}
+  .card[aria-expanded="true"] .chev{transform:rotate(90deg)}
+  .detail{display:none;padding:0 14px 13px 43px;color:var(--muted);font-size:13px;border-top:1px solid transparent}
+  .card[aria-expanded="true"] .detail{display:block}
+  .detail .acts{display:flex;gap:7px;margin-top:11px}
+  .detail .acts button{font-size:11.5px;padding:5px 10px}
+
+  /* review band */
+  .review{background:var(--rev-soft);border:1px solid var(--line);border-left:3px solid var(--rev);border-radius:var(--radius);
+    padding:13px 15px;box-shadow:var(--shadow)}
+  .review .rhd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .review .rtag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--rev);
+    background:var(--surface);border:1px solid var(--line);padding:3px 8px;border-radius:20px}
+  .review .rttl{font-weight:680;font-size:14.5px}
+  .review .rq{margin:9px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+  .review .rq li{margin:3px 0}
+  .review .rfoot{display:flex;align-items:center;gap:11px;margin-top:11px}
+  .review .chk{margin-top:0}
+  .review.done{opacity:.72}
+  .review.done .rttl{text-decoration:line-through}
+
+  dialog{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);
+    padding:0;max-width:440px;width:calc(100% - 32px);box-shadow:0 24px 60px rgba(0,0,0,.35)}
+  dialog::backdrop{background:rgba(8,12,18,.45);backdrop-filter:blur(2px)}
+  form.editor{padding:18px}
+  form.editor h3{margin:0 0 14px;font-size:16px}
+  .fld{margin-bottom:12px}
+  .fld label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:600}
+  .fld input,.fld select,.fld textarea{width:100%;font-family:inherit;font-size:13.5px;color:var(--ink);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  .fld textarea{resize:vertical;min-height:64px}
+  .fld.row{display:flex;gap:10px}.fld.row>div{flex:1}
+  .diaFoot{display:flex;justify-content:space-between;gap:8px;margin-top:6px}
+
+  @media (max-width:680px){
+    .summary{grid-template-columns:1fr}
+    .lanes{grid-template-columns:1fr}
+    body{padding:20px 12px 70px}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">BenchFirst · hackathon build plan</div>
+    <h1>Two tracks, one day, to a judge-ready demo</h1>
+    <p class="sub">Devansh owns the <strong>spec</strong> (prototype-as-spec, contract, state matrix, ship number); Isha owns the <strong>engineering</strong> (DMV app + Bedrock / Akash / Pomerium eval loops). Both build against the same stable contract, so neither is blocked. Reviews with mentors and judges are booked into the timeline.</p>
+
+    <div class="summary" id="summary"></div>
+  </header>
+
+  <div class="toolbar">
+    <button class="primary" id="add">+ Add task</button>
+    <button id="reset">Reset plan</button>
+    <span class="spacer"></span>
+    <span class="hint">Click a card to expand · check to complete · edits save in your browser</span>
+  </div>
+
+  <main id="timeline"></main>
+</div>
+
+<dialog id="editor">
+  <form class="editor" method="dialog" id="editorForm">
+    <h3 id="editorTitle">Add task</h3>
+    <div class="fld row">
+      <div>
+        <label for="f-track">Track</label>
+        <select id="f-track">
+          <option value="dev">Devansh · spec</option>
+          <option value="isha">Isha · engineering</option>
+          <option value="both">Review (both)</option>
+        </select>
+      </div>
+      <div>
+        <label for="f-phase">Phase</label>
+        <select id="f-phase"></select>
+      </div>
+    </div>
+    <div class="fld"><label for="f-title">Title</label><input id="f-title" required maxlength="120" placeholder="What gets done"></div>
+    <div class="fld row">
+      <div><label for="f-est">Estimate (min)</label><input id="f-est" type="number" min="5" step="5" value="30"></div>
+      <div><label for="f-file">Tag / file (optional)</label><input id="f-file" maxlength="40" placeholder="spec/contract.md"></div>
+    </div>
+    <div class="fld"><label for="f-detail">Detail (progressive disclosure)</label><textarea id="f-detail" placeholder="What it means / acceptance"></textarea></div>
+    <div class="diaFoot">
+      <button type="button" id="f-cancel">Cancel</button>
+      <button type="submit" class="primary" id="f-save">Save task</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+  var KEY="benchfirst-plan-v2";
+
+  var PHASES=[
+    {id:"p1",time:"0:00–0:45",name:"Kickoff · lock the contract",kind:"work"},
+    {id:"p2",time:"0:45–2:30",name:"First slice",kind:"work"},
+    {id:"r1",time:"2:30–2:50",name:"Mentor review #1",kind:"review"},
+    {id:"p3",time:"2:50–4:30",name:"Build-out",kind:"work"},
+    {id:"r2",time:"4:30–4:50",name:"Mentor review #2",kind:"review"},
+    {id:"p4",time:"4:50–6:30",name:"Integrate & go live",kind:"work"},
+    {id:"p5",time:"6:30–7:30",name:"Polish & rehearse",kind:"work"},
+    {id:"rj",time:"7:30–8:00",name:"Judge dry-run",kind:"review"}
+  ];
+
+  var DEFAULT=[
+    // Devansh — spec
+    {id:"d1",phase:"p1",track:"dev",title:"Draft the prompt contract",est:40,file:"spec/contract.md",done:false,
+     detail:"The stable interface: out = JSON {reply, confidence, needs_human}; never PII. State what is STABLE (JSON shape + refusal semantics) vs CHANGEABLE (labels, copy, order)."},
+    {id:"d2",phase:"p2",track:"dev",title:"State matrix — one row per state",est:40,file:"spec/state-matrix.md",done:false,
+     detail:"loading / empty / low-confidence / error / success × designed treatment. Forces the unhappy rows onto the page. Undrawn one to design first: low-confidence."},
+    {id:"d3",phase:"p3",track:"dev",title:"Prototype state-switcher",est:50,file:"dmvlist.jsx",done:false,
+     detail:"A dev toggle in the DMV app so empty / error / low-confidence render without typing trigger values — the states are real & clickable, prototype-as-spec."},
+    {id:"d4",phase:"p3",track:"dev",title:"Acceptance = behavior (the ship number)",est:30,file:"spec/acceptance.md",done:false,
+     detail:"Measured on the eval bar, not a screenshot. Proposed: warm cuts candidates ≥50% AND ≥60% time-to-settled cut AND CoV ≤0.08 AND 6/6 checks. Confirm the number."},
+    {id:"d5",phase:"p4",track:"dev",title:"Wire the ship number into demo checks",est:30,file:"scripts/demo.mjs",done:false,
+     detail:"Encode the acceptance number as a deterministic check so 'done' is measured, not asserted."},
+    {id:"d6",phase:"p5",track:"dev",title:"Judge pitch script (2 min)",est:40,done:false,
+     detail:"Benchmark-first → parallel fix → memory transfer → Pomerium verdict-only write. Walk the running prototype, not slides."},
+
+    // Isha — engineering
+    {id:"i0",phase:"p1",track:"isha",title:"Confirm the bench contract",est:20,file:"__benchfirst",done:false,
+     detail:"Lock window.__dmv / window.__benchfirst / schema/verdict.json so both tracks build against a stable interface and nobody is blocked."},
+    {id:"i1",phase:"p2",track:"isha",title:"Wire loop → Bedrock picker",est:30,file:"optimizer/loop.mjs",done:false,
+     detail:"loop calls picker.pickOrder(); Bedrock proposes candidate order, the benchmark disposes. Offline fallback keeps the demo unchanged."},
+    {id:"i2",phase:"p2",track:"isha",title:"S3 scar-file store",est:40,file:"memory/s3-store.mjs",done:false,
+     detail:"GET/PUT the memory to S3 with a local-JSON fallback when no bucket env is set."},
+    {id:"i3",phase:"p3",track:"isha",title:"Verdict writer + writeback",est:50,file:"memory/writer.mjs",done:false,
+     detail:"A tiny endpoint that validates a verdict (measured fields present) then PUTs; loop writeback goes through it. The agent's opinion can't reach S3."},
+    {id:"i4",phase:"p3",track:"isha",title:"Pomerium config",est:30,file:"pomerium/config.yaml",done:false,
+     detail:"Route + allow policy fronting the writer so only the verdict-runner identity can write. Runnable when credits land."},
+    {id:"i5",phase:"p3",track:"isha",title:"Dockerfile + Akash SDL",est:45,file:"akash/deploy.yaml",done:false,
+     detail:"Containerize app + harness; SDL v2.0 with a pinned CPU profile to minimize cross-provider variance."},
+    {id:"i6",phase:"p4",track:"isha",title:"Determinism preflight (CoV gate)",est:30,file:"bench/preflight.mjs",done:false,
+     detail:"Reuse the Phase-0 probe; gate CoV ≤ 0.08 ON the Akash lease before any verdict is trusted."},
+    {id:"i7",phase:"p4",track:"isha",title:"Provision + deploy live",est:90,file:"needs creds",done:false,
+     detail:"AWS creds + S3 bucket, enable Bedrock, redeem the Akash coupon (console), deploy to a lease, stand up Pomerium."},
+    {id:"i8",phase:"p5",track:"isha",title:"Live end-to-end capture",est:45,done:false,
+     detail:"Run Bedrock → Akash → Pomerium → S3 once end-to-end; capture the evidence for the judge."},
+
+    // Reviews
+    {id:"r1a",phase:"r1",track:"both",title:"Mentor review #1 — contract & honesty",est:20,done:false,
+     detail:"Bring the running prototype + spec/contract.md.",
+     questions:["Is the prompt contract the right stable interface?","Is `parallel` a real win and `spinner` a real loser?","Which unhappy state is still undrawn?"]},
+    {id:"r2a",phase:"r2",track:"both",title:"Mentor review #2 — sponsors & gate",est:20,done:false,
+     detail:"Show the wired loop end-to-end (fallbacks ok).",
+     questions:["Are all 3 sponsors load-bearing, not bolted on?","Does the determinism gate actually hold on the lease?","Is verdict-only write enforced (opinion blocked)?"]},
+    {id:"rja",phase:"rj",track:"both",title:"Judge dry-run — acceptance = behavior",est:30,done:false,
+     detail:"Run the demo cold→warm live; tell the trust story.",
+     questions:["Is the ship number met on the eval bar?","Does the cold→warm aha land in 2 minutes?","What judge feedback becomes tomorrow's backlog?"]}
+  ];
+
+  var TRACKS={dev:{name:"Devansh · spec",cls:"dev",varc:"--dev"},isha:{name:"Isha · engineering",cls:"isha",varc:"--isha"}};
+
+  var state=load();
+
+  function load(){
+    try{var s=JSON.parse(localStorage.getItem(KEY));if(s&&s.length)return s;}catch(e){}
+    return DEFAULT.map(function(t){return Object.assign({},t);});
+  }
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+  function uid(){return "t"+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);}
+  function fmt(min){min=+min||0;var h=Math.floor(min/60),m=min%60;return h?(h+"h"+(m?m:"")):(m+"m");}
+  function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+
+  var timeline=document.getElementById("timeline");
+  var summaryEl=document.getElementById("summary");
+
+  function trackTotals(tr){
+    var items=state.filter(function(t){return t.track===tr;});
+    var total=items.reduce(function(a,t){return a+(+t.est||0);},0);
+    var done=items.filter(function(t){return t.done;});
+    var doneMin=done.reduce(function(a,t){return a+(+t.est||0);},0);
+    return {n:items.length,doneN:done.length,total:total,doneMin:doneMin};
+  }
+
+  function renderSummary(){
+    summaryEl.innerHTML="";
+    [["dev","Devansh · spec"],["isha","Isha · engineering"]].forEach(function(p){
+      var t=trackTotals(p[0]);var pct=t.total?Math.round(t.doneMin/t.total*100):0;
+      var c=getComputedStyle(document.documentElement).getPropertyValue(TRACKS[p[0]].varc);
+      var d=document.createElement("div");d.className="metric";
+      d.innerHTML='<div class="lane"><span class="dot" style="background:'+c+'"></span>'+p[1]+'</div>'+
+        '<div class="stat"><span>'+t.doneN+'/'+t.n+' tasks</span><span>'+fmt(t.doneMin)+' / '+fmt(t.total)+'</span></div>'+
+        '<div class="bar"><i style="width:'+pct+'%;background:'+c+'"></i></div>';
+      summaryEl.appendChild(d);
+    });
+  }
+
+  function taskCard(t){
+    var card=document.createElement("div");
+    card.className="card "+TRACKS[t.track].cls+(t.done?" done":"");
+    card.setAttribute("aria-expanded","false");
+    var pills='<span class="pill est">'+fmt(t.est)+'</span>';
+    if(t.file) pills+='<span class="pill '+(t.file==="needs creds"?"creds":"file")+'">'+esc(t.file)+'</span>';
+    card.innerHTML=
+      '<div class="card-main">'+
+        '<input type="checkbox" class="chk" '+(t.done?"checked":"")+' aria-label="Mark done">'+
+        '<div class="card-body"><div class="ttl">'+esc(t.title)+'</div><div class="meta">'+pills+'</div></div>'+
+        '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>'+
+      '</div>'+
+      '<div class="detail"><div>'+esc(t.detail||"")+'</div>'+
+        '<div class="acts"><button data-act="edit">Edit</button><button data-act="del">Delete</button></div>'+
+      '</div>';
+    wire(card,t);
+    return card;
+  }
+
+  function reviewBand(t){
+    var el=document.createElement("div");
+    el.className="review"+(t.done?" done":"");
+    var qs=(t.questions||[]).map(function(q){return "<li>"+esc(q)+"</li>";}).join("");
+    el.innerHTML=
+      '<div class="rhd"><span class="rtag">Feedback review</span><span class="rttl">'+esc(t.title)+'</span><span class="pill est">'+fmt(t.est)+'</span></div>'+
+      (t.detail?'<div class="rq" style="list-style:none;padding-left:0;margin-top:7px">'+esc(t.detail)+'</div>':'')+
+      (qs?'<ul class="rq">'+qs+'</ul>':'')+
+      '<div class="rfoot"><input type="checkbox" class="chk" '+(t.done?"checked":"")+' aria-label="Mark review done"><span style="font-size:12.5px;color:var(--muted)">Mark when the review is held & notes captured</span>'+
+      '<span style="flex:1"></span><button data-act="edit" style="font-size:11.5px;padding:5px 10px">Edit</button><button data-act="del" style="font-size:11.5px;padding:5px 10px">Delete</button></div>';
+    var chk=el.querySelector(".chk");
+    chk.addEventListener("change",function(){t.done=chk.checked;el.classList.toggle("done",t.done);save();renderSummary();});
+    el.querySelector('[data-act="edit"]').addEventListener("click",function(){openEditor(t);});
+    el.querySelector('[data-act="del"]').addEventListener("click",function(){delTask(t);});
+    return el;
+  }
+
+  function wire(card,t){
+    var main=card.querySelector(".card-main");
+    var chk=card.querySelector(".chk");
+    chk.addEventListener("click",function(e){e.stopPropagation();});
+    chk.addEventListener("change",function(){t.done=chk.checked;card.classList.toggle("done",t.done);save();renderSummary();});
+    main.addEventListener("click",function(){
+      var open=card.getAttribute("aria-expanded")==="true";
+      card.setAttribute("aria-expanded",open?"false":"true");
+    });
+    card.querySelector('[data-act="edit"]').addEventListener("click",function(e){e.stopPropagation();openEditor(t);});
+    card.querySelector('[data-act="del"]').addEventListener("click",function(e){e.stopPropagation();delTask(t);});
+  }
+
+  function render(){
+    timeline.innerHTML="";
+    PHASES.forEach(function(ph){
+      var items=state.filter(function(t){return t.phase===ph.id;});
+      var wrap=document.createElement("section");wrap.className="phase";
+      wrap.innerHTML='<div class="phaserow"><span class="clock">'+ph.time+'</span><span class="phasename">'+esc(ph.name)+'</span><span class="phaseline"></span></div>';
+      if(ph.kind==="review"){
+        items.forEach(function(t){wrap.appendChild(reviewBand(t));});
+      }else{
+        var lanes=document.createElement("div");lanes.className="lanes";
+        ["dev","isha"].forEach(function(tr){
+          var col=document.createElement("div");col.className="lane-col";
+          var c=getComputedStyle(document.documentElement).getPropertyValue(TRACKS[tr].varc);
+          col.innerHTML='<div class="lane-head"><span class="dot" style="background:'+c+'"></span>'+TRACKS[tr].name+'</div>';
+          var these=items.filter(function(t){return t.track===tr;});
+          if(!these.length){var e=document.createElement("div");e.style.cssText="font-size:12px;color:var(--muted);padding:6px 2px;font-family:var(--mono)";e.textContent="—";col.appendChild(e);}
+          these.forEach(function(t){col.appendChild(taskCard(t));});
+          lanes.appendChild(col);
+        });
+        wrap.appendChild(lanes);
+      }
+      timeline.appendChild(wrap);
+    });
+    renderSummary();
+  }
+
+  function delTask(t){
+    if(!confirm('Delete "'+t.title+'"?'))return;
+    state=state.filter(function(x){return x!==t;});save();render();
+  }
+
+  // editor dialog
+  var dia=document.getElementById("editor");
+  var form=document.getElementById("editorForm");
+  var fTrack=document.getElementById("f-track"),fPhase=document.getElementById("f-phase"),
+      fTitle=document.getElementById("f-title"),fEst=document.getElementById("f-est"),
+      fFile=document.getElementById("f-file"),fDetail=document.getElementById("f-detail"),
+      fTitleH=document.getElementById("editorTitle");
+  PHASES.forEach(function(p){var o=document.createElement("option");o.value=p.id;o.textContent=p.time+"  ·  "+p.name;fPhase.appendChild(o);});
+  var editing=null;
+
+  function openEditor(t){
+    editing=t||null;
+    fTitleH.textContent=t?"Edit task":"Add task";
+    fTrack.value=t?t.track:"dev";
+    fPhase.value=t?t.phase:"p1";
+    fTitle.value=t?t.title:"";
+    fEst.value=t?t.est:30;
+    fFile.value=t&&t.file?t.file:"";
+    fDetail.value=t&&t.detail?t.detail:"";
+    if(typeof dia.showModal==="function")dia.showModal();else dia.setAttribute("open","");
+    setTimeout(function(){fTitle.focus();},30);
+  }
+  form.addEventListener("submit",function(e){
+    e.preventDefault();
+    var data={track:fTrack.value,phase:fPhase.value,title:fTitle.value.trim()||"Untitled",
+      est:+fEst.value||0,file:fFile.value.trim(),detail:fDetail.value.trim()};
+    if(editing){Object.assign(editing,data);}
+    else{data.id=uid();data.done=false;if(data.track==="both")data.questions=[];state.push(data);}
+    save();render();dia.close();
+  });
+  document.getElementById("f-cancel").addEventListener("click",function(){dia.close();});
+  document.getElementById("add").addEventListener("click",function(){openEditor(null);});
+  document.getElementById("reset").addEventListener("click",function(){
+    if(!confirm("Reset the plan to the original tasks? Your changes will be lost."))return;
+    state=DEFAULT.map(function(t){return Object.assign({},t);});save();render();
+  });
+
+  render();
+})();
+</script>
+</body></html>
