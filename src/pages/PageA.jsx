@@ -11,7 +11,7 @@ const STREETS = [
   'Sunset Blvd', 'Foothill Rd', 'Del Monte Ave', 'Ventura Blvd', 'Alameda St',
 ];
 
-const OFFICE_COUNT = 4000;
+const OFFICE_COUNT = 10000;
 
 // Deterministic mock office rows (index-derived, no randomness) so the bench
 // harness sees the same data every run.
@@ -24,8 +24,7 @@ function makeOffices() {
       name: `${city} DMV Field Office #${i + 1}`,
       address: `${100 + ((i * 17) % 8900)} ${street}`,
       city,
-      distance: ((i * 0.37) % 62) + 0.4, // miles
-      wait: (i * 7) % 75, // current wait, minutes
+      minutes: (i * 7) % 75, // current wait, minutes
       // Deterministic lat/lng within California for the live haversine distance.
       lat: 34 + ((i * 0.013) % 8),
       lng: -124 + ((i * 0.021) % 10),
@@ -33,7 +32,7 @@ function makeOffices() {
   });
 }
 
-// Page A — "Find a DMV office": ~800 offices where walking the highlight down
+// Page A — "Find a DMV office": 10,000 offices where walking the highlight down
 // re-renders the whole list each step in the baseline.
 export default function PageA({ variant }) {
   const offices = useMemo(makeOffices, []);
@@ -42,14 +41,13 @@ export default function PageA({ variant }) {
   // fires after every render and console.logs all current wait times — a wasteful
   // side effect that has nothing to do with the real per-row render cost.
   useEffect(() => {
-    console.log('[PageA] current wait times:', offices.map((o) => o.wait));
+    console.log('[PageA] current wait times:', offices.map((o) => o.minutes));
   });
 
   return (
     <DmvList
       pageId="a"
       title="Find a DMV office"
-      iters={150}
       steps={20}
       strategy={variant}
       items={offices}

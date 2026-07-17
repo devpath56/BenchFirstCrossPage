@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 
-// Simulated per-row render cost. Real React perf work has a cost per row;
-// this makes re-rendering N rows actually take measurable main-thread time.
-function work(seed, iters) {
-  let x = 0;
-  for (let i = 0; i < iters; i++) x += Math.sqrt(((seed + i) % 97) + 1) * 1.0000001;
-  return x;
-}
-
 // Ugly-on-purpose wait-time badge: green / amber / red, government-website style.
 function waitClass(mins) {
   if (mins <= 15) return 'wait-ok';
@@ -21,90 +13,97 @@ function waitClass(mins) {
 const USER_LAT = 38.5816;
 const USER_LNG = -121.4944;
 
-// EXPENSIVE PER-ROW COMPUTATION #1 (intentional, NOT memoized): format a wait
-// time via wasteful nested string manipulation instead of a simple template.
-function formatWaitTime(minutes) {
-  const digits = String(Math.max(0, Math.floor(minutes)));
-  let acc = '';
-  // Nested loops that repeatedly rebuild the same string, char by char.
-  for (let i = 0; i < digits.length; i++) {
-    let seg = digits;
-    for (let k = 0; k < digits.length; k++) {
-      seg = seg.split('').map((c) => c).join('');   // rebuild the whole string
-      seg = seg.slice(0, seg.length).toUpperCase();  // and slice/upper it again
-    }
-    acc += seg.charAt(i);
-  }
-  const total = parseInt(acc || digits, 10);
-  const hrs = Math.floor(total / 60);
-  const mins = total % 60;
-  return hrs > 0 ? `${hrs} hr ${mins} min` : `${mins} min`;
-}
-
-// EXPENSIVE PER-ROW COMPUTATION #2 (intentional, NOT memoized): great-circle
-// distance from the user to the office via the haversine formula, every render.
-function computeDistance(userLat, userLng, officeLat, officeLng) {
+// EXPENSIVE PER-ROW COMPUTATION #1 (intentional, NOT memoized): great-circle
+// distance via the haversine formula, recomputed for every row on every render.
+function haversineDistance(userLat, userLng, lat, lng) {
   const R = 3958.8; // Earth radius in miles
   const toRad = (deg) => (deg * Math.PI) / 180;
-  const dLat = toRad(officeLat - userLat);
-  const dLng = toRad(officeLng - userLng);
+  const dLat = toRad(lat - userLat);
+  const dLng = toRad(lng - userLng);
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(userLat)) * Math.cos(toRad(officeLat)) * Math.sin(dLng / 2) ** 2;
+    Math.cos(toRad(userLat)) * Math.cos(toRad(lat)) * Math.sin(dLng / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
-// EXPENSIVE PER-ROW COMPUTATION #3 (intentional, NOT memoized): a bogus
-// "availability score" that loops 200 times per row on every render.
-function calculateAvailabilityScore(row) {
-  let score = 0;
-  const seed = row.wait != null ? row.wait : row.id;
-  for (let i = 0; i < 200; i++) {
-    score += Math.sin(seed + i) * Math.cos(row.id + i);
-    score = (score + i * 0.5) % 997;
+// EXPENSIVE PER-ROW COMPUTATION #2 (intentional, NOT memoized): format a wait
+// time with a wasteful 500-iteration string-concatenation loop.
+function formatWaitTime(minutes) {
+  const total = Math.max(0, Math.floor(minutes || 0));
+  const hrs = Math.floor(total / 60);
+  const mins = total % 60;
+  const base = (hrs > 0 ? `${hrs} hr ${mins} min` : `${mins} min`) + ' ';
+  // 500 iterations of string concatenation just to build the same label.
+  let buf = '';
+  for (let i = 0; i < 500; i++) {
+    buf += base.charAt(i % base.length);
   }
-  return Math.abs(Math.round(score));
+  // Fold the wasted work back into a clean label so it can't be optimized away.
+  return buf.trim().slice(0, base.length - 1) || base.trim();
 }
 
-// A single DMV list row. `kind` selects which mock fields to render — it is a
-// stable string prop, so React.memo can still short-circuit unchanged rows.
-function Row({ item, highlighted, iters, kind }) {
-  // Global render counter — a deterministic corroborating metric (counts don't jitter).
-  window.__rowRenders = (window.__rowRenders || 0) + 1;
-  work(item.id, iters);
-
-  // Three expensive, un-memoized computations run for EVERY visible row on
-  // EVERY render — this is what makes the baseline visibly slow.
-  const dist = computeDistance(USER_LAT, USER_LNG, item.lat, item.lng);
-  const score = calculateAvailabilityScore(item);
-
-  if (kind === 'office') {
-    return (
-      <div className={'row' + (highlighted ? ' hi' : '')} title={`Availability score: ${score}`}>
-        <span className="cell cell-name">{item.name}</span>
-        <span className="cell cell-addr">{item.address}</span>
-        <span className="cell cell-city">{item.city}</span>
-        <span className="cell cell-dist">{dist.toFixed(1)} mi</span>
-        <span className={'badge ' + waitClass(item.wait)}>{formatWaitTime(item.wait)} wait</span>
-      </div>
-    );
+// EXPENSIVE PER-ROW COMPUTATION #3 (intentional, NOT memoized): scan 50 rows of
+// the full list, haversine each, and return the nearest — every row, every render.
+function findNearestOffices(row, allOffices) {
+  const n = allOffices.length;
+  let nearest = null;
+  let nearestDist = Infinity;
+  for (let i = 1; i <= 50; i++) {
+    const other = allOffices[(row.id + i) % n];
+    const d = haversineDistance(row.lat, row.lng, other.lat, other.lng);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearest = other;
+    }
   }
+  return nearest;
+}
 
-  // kind === 'slot'
+// A single "Find a DMV office" row. Runs all three expensive computations on
+// every render. Defined at module scope so React.memo can short-circuit it.
+function OfficeRow({ item, highlighted, allItems }) {
+  window.__rowRenders = (window.__rowRenders || 0) + 1;
+
+  const dist = haversineDistance(USER_LAT, USER_LNG, item.lat, item.lng);
+  const waitLabel = formatWaitTime(item.minutes);
+  const nearest = findNearestOffices(item, allItems);
+
   return (
-    <div className={'row' + (highlighted ? ' hi' : '')} title={`Availability score: ${score}`}>
+    <div className={'row' + (highlighted ? ' hi' : '')}>
+      <span className="cell cell-name">{item.name}</span>
+      <span className="cell cell-addr">{item.address}</span>
+      <span className="cell cell-city">{item.city}</span>
+      <span className="cell cell-near">Nearest: {nearest ? nearest.city : '—'}</span>
+      <span className="cell cell-dist">{dist.toFixed(1)} mi</span>
+      <span className={'badge ' + waitClass(item.minutes)}>{waitLabel} wait</span>
+    </div>
+  );
+}
+
+// A "Book an appointment" time-slot row. Lighter than OfficeRow (no 50-row
+// scan), but still runs the live haversine so the 15k-row baseline stays heavy.
+function SlotRow({ item, highlighted }) {
+  window.__rowRenders = (window.__rowRenders || 0) + 1;
+
+  const dist = haversineDistance(USER_LAT, USER_LNG, item.lat, item.lng);
+  const waitLabel = formatWaitTime(item.minutes);
+
+  return (
+    <div className={'row' + (highlighted ? ' hi' : '')}>
       <span className="cell cell-date">{item.date}</span>
       <span className="cell cell-time">{item.time}</span>
       <span className="cell cell-office">{item.office}</span>
       <span className="cell cell-service">{item.service}</span>
       <span className="cell cell-dist">{dist.toFixed(1)} mi</span>
+      <span className="cell cell-hold">{waitLabel} hold</span>
     </div>
   );
 }
 
 // The one-line "fix": memoize rows so only the rows whose props changed re-render.
-const MemoRow = React.memo(Row);
+const MemoOfficeRow = React.memo(OfficeRow);
+const MemoSlotRow = React.memo(SlotRow);
 
 /**
  * A mock California DMV list. The shared pathology is unchanged from the
@@ -123,7 +122,7 @@ const MemoRow = React.memo(Row);
  *   kind     — 'office' | 'slot', selects the row layout
  *   filters  — config for the government-ugly filter row: two <select>s + one text input
  */
-export default function DmvList({ pageId, title, iters, steps, strategy, items, kind, filters }) {
+export default function DmvList({ pageId, title, steps, strategy, items, kind, filters }) {
   const rowCount = items.length;
   const [hi, setHi] = useState(0);
 
@@ -169,16 +168,24 @@ export default function DmvList({ pageId, title, iters, steps, strategy, items, 
   }, [pageId, rowCount, steps, strategy]);
 
   const usesMemo = strategy === 'memo' || strategy === 'memo-badprops';
-  const RowComp = usesMemo ? MemoRow : Row;
+  const BaseRow = kind === 'office' ? OfficeRow : SlotRow;
+  const MemoRow = kind === 'office' ? MemoOfficeRow : MemoSlotRow;
+  const RowComp = usesMemo ? MemoRow : BaseRow;
   const badProps = strategy === 'memo-badprops';
 
-  // Apply the filter form. With empty defaults this is a no-op (all rows pass),
-  // so the benchmark is unaffected; a user narrowing the filters re-renders the
-  // whole list (the antipattern above).
+  // ANTIPATTERN (intentional, do not "fix"): with no memoization and no debounce,
+  // recompute the filtered list on every render — and for every candidate row
+  // rebuild a fully lowercased copy of EVERY field. Typing in the filter box
+  // re-lowercases every field of every row on each keystroke.
+  const q = text.toLowerCase();
+  const s1 = selectOne.toLowerCase();
+  const s2 = selectTwo.toLowerCase();
   const filtered = items.filter((it) => {
-    if (selectOne !== 'all' && String(it[filters.selectOne.key]) !== selectOne) return false;
-    if (selectTwo !== 'all' && String(it[filters.selectTwo.key]) !== selectTwo) return false;
-    if (text && !String(it[filters.text.key]).toLowerCase().includes(text.toLowerCase())) return false;
+    const lower = {};
+    for (const key in it) lower[key] = String(it[key]).toLowerCase();
+    if (selectOne !== 'all' && lower[filters.selectOne.key] !== s1) return false;
+    if (selectTwo !== 'all' && lower[filters.selectTwo.key] !== s2) return false;
+    if (q && !lower[filters.text.key].includes(q)) return false;
     return true;
   });
 
@@ -270,8 +277,7 @@ export default function DmvList({ pageId, title, iters, steps, strategy, items, 
               key={it.id}
               item={it}
               highlighted={it.id === hi}
-              iters={iters}
-              kind={kind}
+              allItems={items}
               // A fresh function identity every render defeats React.memo entirely.
               cb={badProps ? () => {} : undefined}
             />
