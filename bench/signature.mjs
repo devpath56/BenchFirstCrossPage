@@ -1,8 +1,11 @@
-// A "symptom signature" describes the PROBLEM, not the page identity — so a fix
-// learned on one page can be retrieved for any other page with the same problem.
-// Deliberately coarse: two different pages with a large per-row-update list get
-// the same signature, which is exactly what makes cross-page transfer work.
+// A "symptom signature" names the PERFORMANCE PROBLEM CLASS, not the page identity —
+// so a fix learned on one page transfers to any other page with the same class.
+//
+// The two DMV pages (Registration, Appointments) both suffer a request WATERFALL
+// (`interaction: 'waterfall-load'`), so they key to the SAME signature and the
+// `parallel` fix transfers between them BY DESIGN — not by an accidental collapse.
+// Component count differs per page (Registration 7, Appointments 5); that is
+// page-specific size and is deliberately NOT part of the transfer key.
 export function signature(profile) {
-  const size = profile.rowCount >= 1000 ? 'large' : 'small';
-  return `${profile.interaction}:${size}-list`;
+  return profile.interaction || 'unknown';
 }

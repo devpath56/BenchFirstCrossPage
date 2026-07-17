@@ -29,7 +29,6 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
     warmStarted: !!known,
     baselineMs: +baseline.mean.toFixed(1),
     baselineCov: baseline.cov,
-    baselineRowRenders: baseline.rowRenders,
     candidates: [],
     benchRuns: baseline.n,
     skippedKnownLosers: [],
@@ -61,7 +60,6 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
       ms: +m.mean.toFixed(1),
       deltaPct: +deltaPct.toFixed(1),
       beat,
-      rowRenders: m.rowRenders,
     });
     // Warm-start early stop: if memory pointed us at a winner and it beats, we're
     // done — no need to explore the rest. This is the cross-page speed-up (B).

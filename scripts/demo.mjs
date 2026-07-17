@@ -28,7 +28,7 @@ function printReport(r) {
       `    candidate ${c.strategy.padEnd(9)} ${String(c.ms).padStart(7)}ms  Δ ${String(c.deltaPct).padStart(5)}%  ${mark}`
     );
   }
-  if (r.done) console.log(`  → winner: ${r.winner}  (−${r.winnerDeltaPct}% render time)  · tested ${r.candidates.length} candidate(s), ${r.benchRuns} bench runs`);
+  if (r.done) console.log(`  → winner: ${r.winner}  (−${r.winnerDeltaPct}% time-to-settled)  · tested ${r.candidates.length} candidate(s), ${r.benchRuns} bench runs`);
   else console.log(`  → ${r.refusal}`);
 }
 
@@ -41,7 +41,7 @@ function printContrast(a, b) {
   row('candidates tested', a.candidates.length, b.candidates.length);
   row('benchmark runs', a.benchRuns, b.benchRuns);
   row('winner', a.winner, b.winner);
-  row('render-time cut', `−${a.winnerDeltaPct}%`, `−${b.winnerDeltaPct}%`);
+  row('time-to-settled cut', `−${a.winnerDeltaPct}%`, `−${b.winnerDeltaPct}%`);
   row('warm-started from memory', 'no', b.warmStarted ? `yes (from ${b.candidates.length ? 'Page A' : '—'})` : 'no');
 }
 

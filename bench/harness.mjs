@@ -77,22 +77,17 @@ function stats(xs) {
 // fresh browser context each time. Returns mean render-ms, CoV, row-render count.
 export async function measure(browser, url, pageId, variant, runs = 3) {
   const vals = [];
-  let rowRenders = 0;
   for (let i = 0; i < runs + 1; i++) {
     const m = await withPage(browser, url, pageId, variant, (page) =>
       page.evaluate(() => window.__runInteraction())
     );
-    if (i > 0) {
-      vals.push(m.ms);
-      rowRenders = m.rowRenders;
-    }
+    if (i > 0) vals.push(m.ms); // i===0 is a discarded warm-up
   }
   const s = stats(vals);
   return {
     mean: s.mean,
     cov: +s.cov.toFixed(4),
     n: vals.length,
-    rowRenders,
     runs: vals.map((v) => +v.toFixed(1)),
   };
 }
