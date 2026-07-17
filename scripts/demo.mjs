@@ -20,12 +20,12 @@ function ensureBuild() {
 function printReport(r) {
   const tag = r.warmStarted ? 'WARM (memory hit)' : 'COLD (empty memory)';
   console.log(`\n  Page ${r.pageId.toUpperCase()}  ·  signature="${r.signature}"  ·  ${tag}`);
-  console.log(`  baseline: ${r.baselineMs}ms render  (CoV ${r.baselineCov}, ${r.baselineRowRenders} row-renders)`);
+  console.log(`  baseline: ${r.baselineMs}ms time-to-settled  (CoV ${r.baselineCov})`);
   if (r.skippedKnownLosers.length) console.log(`  skipped known losers: ${r.skippedKnownLosers.join(', ')}`);
   for (const c of r.candidates) {
     const mark = c.beat ? '✓ beats' : '✗ misses';
     console.log(
-      `    candidate ${c.strategy.padEnd(9)} ${String(c.ms).padStart(7)}ms  Δ ${String(c.deltaPct).padStart(5)}%  ${mark}  (${c.rowRenders} row-renders)`
+      `    candidate ${c.strategy.padEnd(9)} ${String(c.ms).padStart(7)}ms  Δ ${String(c.deltaPct).padStart(5)}%  ${mark}`
     );
   }
   if (r.done) console.log(`  → winner: ${r.winner}  (−${r.winnerDeltaPct}% render time)  · tested ${r.candidates.length} candidate(s), ${r.benchRuns} bench runs`);

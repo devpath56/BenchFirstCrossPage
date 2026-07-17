@@ -10,9 +10,9 @@ import { measure, readProfile } from '../bench/harness.mjs';
 import * as memory from '../memory/store.mjs';
 
 const THRESHOLD = 20; // a candidate must cut render time by >=20% to count as a real win
-// The candidate fixes the optimizer can try (baseline is the thing we beat).
-// `memo-badprops` is a plausible fix that does NOT help — memory learns to skip it.
-const ALL_FIXES = ['memo', 'memo-badprops', 'windowed'];
+// The candidate fixes the optimizer can try (baseline = the request-waterfall we beat).
+// `spinner` is a cosmetic non-fix that does NOT cut load time — memory learns to skip it.
+const ALL_FIXES = ['parallel', 'spinner'];
 
 export async function optimize({ browser, url, pageId, runs = 3 }) {
   const profile = await readProfile(browser, url, pageId);
