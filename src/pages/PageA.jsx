@@ -11,7 +11,7 @@ const STREETS = [
   'Sunset Blvd', 'Foothill Rd', 'Del Monte Ave', 'Ventura Blvd', 'Alameda St',
 ];
 
-const OFFICE_COUNT = 800;
+const OFFICE_COUNT = 1000;
 
 // Deterministic mock office rows (index-derived, no randomness) so the bench
 // harness sees the same data every run.
