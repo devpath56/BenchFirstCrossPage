@@ -14,6 +14,28 @@
         color: #1a1a1a;
       }
 
+      /* --- Top navigation bar --- */
+      .dmv-nav {
+        display: flex;
+        gap: 0;
+        background: #002347;
+        border-bottom: 1px solid #001a33;
+      }
+      .dmv-nav-link {
+        color: #cfd8e3;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: bold;
+        padding: 8px 16px;
+        border-right: 1px solid #001a33;
+      }
+      .dmv-nav-link:hover { background: #003466; color: #ffffff; }
+      .dmv-nav-link.active {
+        background: #003466;
+        color: #ffffff;
+        border-bottom: 3px solid #ffb819;
+      }
+
       /* --- State of California header bar --- */
       .dmv-header {
         background: #003466;

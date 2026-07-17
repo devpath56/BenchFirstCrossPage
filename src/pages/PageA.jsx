@@ -11,7 +11,7 @@ const STREETS = [
   'Sunset Blvd', 'Foothill Rd', 'Del Monte Ave', 'Ventura Blvd', 'Alameda St',
 ];
 
-const OFFICE_COUNT = 1000;
+const OFFICE_COUNT = 4000;
 
 // Deterministic mock office rows (index-derived, no randomness) so the bench
 // harness sees the same data every run.
@@ -26,6 +26,9 @@ function makeOffices() {
       city,
       distance: ((i * 0.37) % 62) + 0.4, // miles
       wait: (i * 7) % 75, // current wait, minutes
+      // Deterministic lat/lng within California for the live haversine distance.
+      lat: 34 + ((i * 0.013) % 8),
+      lng: -124 + ((i * 0.021) % 10),
     };
   });
 }

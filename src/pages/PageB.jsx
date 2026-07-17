@@ -26,7 +26,7 @@ const TIMES = [
   '03:00 PM', '03:30 PM', '04:00 PM',
 ];
 
-const SLOT_COUNT = 1500;
+const SLOT_COUNT = 6000;
 
 // Deterministic mock appointment slots (index-derived, no randomness).
 function makeSlots() {
@@ -36,6 +36,9 @@ function makeSlots() {
     time: TIMES[(i * 3) % TIMES.length],
     office: OFFICES[(i * 5) % OFFICES.length],
     service: SERVICES[(i * 7) % SERVICES.length],
+    // Deterministic lat/lng within California for the live haversine distance.
+    lat: 34 + ((i * 0.011) % 8),
+    lng: -124 + ((i * 0.019) % 10),
   }));
 }
 
