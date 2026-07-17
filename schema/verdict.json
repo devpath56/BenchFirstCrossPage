@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BenchFirst verdict (the only thing allowed to write the scar file)",
+  "description": "A verdict is an EARNED, measured result — not the agent's opinion. The Pomerium-gated writer accepts only payloads matching this shape before persisting to the S3 scar file.",
+  "type": "object",
+  "required": ["signature", "record"],
+  "properties": {
+    "signature": { "type": "string", "description": "problem signature (page-agnostic)" },
+    "record": {
+      "type": "object",
+      "required": ["winner", "candidates"],
+      "properties": {
+        "winner": { "type": "string" },
+        "candidates": {
+          "type": "object",
+          "description": "map strategy -> measured result",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["deltaPct", "beat"],
+            "properties": {
+              "deltaPct": { "type": "number", "description": "MEASURED render-time delta vs baseline" },
+              "beat": { "type": "boolean", "description": "beat baseline by the threshold" }
+            }
+          }
+        },
+        "firstSeenPage": { "type": "string" },
+        "updatedByPage": { "type": "string" },
+        "provenance": {
+          "type": "object",
+          "description": "where the measurement ran; a verdict without a benchmark source is untrusted",
+          "properties": {
+            "runner": { "enum": ["local", "akash"] },
+            "cov": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}
