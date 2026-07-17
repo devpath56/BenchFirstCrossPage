@@ -11,6 +11,10 @@
       "required": ["winner", "candidates"],
       "properties": {
         "winner": { "type": "string" },
+        "confidence": {
+          "type": "number", "minimum": 0, "maximum": 1,
+          "description": "explicit trust in this verdict = measurement trust (from cov) x win margin over threshold; 0..1. Emitted by the optimizer, not re-derived by consumers."
+        },
         "candidates": {
           "type": "object",
           "description": "map strategy -> measured result",

@@ -9,7 +9,9 @@ import { signature } from '../bench/signature.mjs';
 import { measure, readProfile } from '../bench/harness.mjs';
 import * as memory from '../memory/store.mjs';
 
-const THRESHOLD = 20; // a candidate must cut render time by >=20% to count as a real win
+const THRESHOLD = 20; // a candidate must cut time-to-settled by >=20% to count as a real win
+const COV_GATE = 0.08; // benchmark is untrusted above this coefficient of variation
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // The candidate fixes the optimizer can try (baseline = the request-waterfall we beat).
 // `spinner` is a cosmetic non-fix that does NOT cut load time — memory learns to skip it.
 const ALL_FIXES = ['parallel', 'spinner'];
@@ -78,6 +80,13 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
   report.winner = winners[0].strategy;
   report.winnerDeltaPct = winners[0].deltaPct;
 
+  // Explicit confidence (0..1) carried WITH the verdict = measurement trust × win margin.
+  // Trust is high when the benchmark is tight (low cov) AND the win clears the threshold
+  // comfortably. It is emitted, not left for a consumer to re-derive.
+  const covTrust = clamp01(1 - baseline.cov / COV_GATE);
+  const marginTrust = clamp01((report.winnerDeltaPct - THRESHOLD) / THRESHOLD);
+  report.confidence = +(covTrust * marginTrust).toFixed(2);
+
   // 5. Write back to memory (merge new knowledge with any prior knowledge).
   const mergedCandidates = known ? { ...known.candidates } : {};
   for (const c of report.candidates) {
@@ -86,6 +95,8 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
   mem[sig] = {
     winner: report.winner,
     candidates: mergedCandidates,
+    confidence: report.confidence,
+    provenance: { runner: 'local', cov: baseline.cov },
     firstSeenPage: known?.firstSeenPage ?? pageId,
     updatedByPage: pageId,
   };

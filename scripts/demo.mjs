@@ -28,7 +28,7 @@ function printReport(r) {
       `    candidate ${c.strategy.padEnd(9)} ${String(c.ms).padStart(7)}ms  Δ ${String(c.deltaPct).padStart(5)}%  ${mark}`
     );
   }
-  if (r.done) console.log(`  → winner: ${r.winner}  (−${r.winnerDeltaPct}% time-to-settled)  · tested ${r.candidates.length} candidate(s), ${r.benchRuns} bench runs`);
+  if (r.done) console.log(`  → winner: ${r.winner}  (−${r.winnerDeltaPct}% time-to-settled, confidence ${r.confidence})  · tested ${r.candidates.length} candidate(s), ${r.benchRuns} bench runs`);
   else console.log(`  → ${r.refusal}`);
 }
 

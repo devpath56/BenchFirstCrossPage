@@ -21,7 +21,7 @@ would be reasoning by analogy. The contract below is derived from what the agent
 ## Input → Output
 - **Input:** a page under a variant + its problem signature (`{ interaction }`, via `bench/signature.mjs`).
 - **Output:** a **verdict** conforming to `schema/verdict.json` — `winner`, per-candidate `{ deltaPct, beat }`, and `provenance { runner, cov }`.
-- **`confidence`** is not a self-reported number — it is the *measurement's* trust: `provenance.cov` (tight = trustworthy) plus the winner's margin over the threshold.
+- **`confidence`** is an **explicit field emitted with the verdict** (`schema/verdict.json`, written by `optimizer/loop.mjs`): a 0–1 scalar = measurement trust (from `provenance.cov`) × the winner's margin over the threshold. Consumers read it; they never re-derive it.
 - **`needs_human` (refusal)** is true iff **(a)** no candidate beats baseline (*refuse-done*) **OR (b)** `cov > 0.08` (*benchmark untrusted*). **(a)** is enforced today in `optimizer/loop.mjs`; **(b)** is the planned determinism preflight (`bench/preflight.mjs`, engineering track) — not decided by prose.
 - **Never PII:** a verdict is perf data only — timings, deltas, strategy names. No user content ever enters the payload.
 
