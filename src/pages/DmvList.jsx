@@ -16,6 +16,57 @@ function waitClass(mins) {
   return 'wait-bad';
 }
 
+// The user's assumed location (downtown Sacramento) — used by the haversine
+// distance computed live for every row on every render.
+const USER_LAT = 38.5816;
+const USER_LNG = -121.4944;
+
+// EXPENSIVE PER-ROW COMPUTATION #1 (intentional, NOT memoized): format a wait
+// time via wasteful nested string manipulation instead of a simple template.
+function formatWaitTime(minutes) {
+  const digits = String(Math.max(0, Math.floor(minutes)));
+  let acc = '';
+  // Nested loops that repeatedly rebuild the same string, char by char.
+  for (let i = 0; i < digits.length; i++) {
+    let seg = digits;
+    for (let k = 0; k < digits.length; k++) {
+      seg = seg.split('').map((c) => c).join('');   // rebuild the whole string
+      seg = seg.slice(0, seg.length).toUpperCase();  // and slice/upper it again
+    }
+    acc += seg.charAt(i);
+  }
+  const total = parseInt(acc || digits, 10);
+  const hrs = Math.floor(total / 60);
+  const mins = total % 60;
+  return hrs > 0 ? `${hrs} hr ${mins} min` : `${mins} min`;
+}
+
+// EXPENSIVE PER-ROW COMPUTATION #2 (intentional, NOT memoized): great-circle
+// distance from the user to the office via the haversine formula, every render.
+function computeDistance(userLat, userLng, officeLat, officeLng) {
+  const R = 3958.8; // Earth radius in miles
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(officeLat - userLat);
+  const dLng = toRad(officeLng - userLng);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(userLat)) * Math.cos(toRad(officeLat)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// EXPENSIVE PER-ROW COMPUTATION #3 (intentional, NOT memoized): a bogus
+// "availability score" that loops 200 times per row on every render.
+function calculateAvailabilityScore(row) {
+  let score = 0;
+  const seed = row.wait != null ? row.wait : row.id;
+  for (let i = 0; i < 200; i++) {
+    score += Math.sin(seed + i) * Math.cos(row.id + i);
+    score = (score + i * 0.5) % 997;
+  }
+  return Math.abs(Math.round(score));
+}
+
 // A single DMV list row. `kind` selects which mock fields to render — it is a
 // stable string prop, so React.memo can still short-circuit unchanged rows.
 function Row({ item, highlighted, iters, kind }) {
@@ -23,25 +74,31 @@ function Row({ item, highlighted, iters, kind }) {
   window.__rowRenders = (window.__rowRenders || 0) + 1;
   work(item.id, iters);
 
+  // Three expensive, un-memoized computations run for EVERY visible row on
+  // EVERY render — this is what makes the baseline visibly slow.
+  const dist = computeDistance(USER_LAT, USER_LNG, item.lat, item.lng);
+  const score = calculateAvailabilityScore(item);
+
   if (kind === 'office') {
     return (
-      <div className={'row' + (highlighted ? ' hi' : '')}>
+      <div className={'row' + (highlighted ? ' hi' : '')} title={`Availability score: ${score}`}>
         <span className="cell cell-name">{item.name}</span>
         <span className="cell cell-addr">{item.address}</span>
         <span className="cell cell-city">{item.city}</span>
-        <span className="cell cell-dist">{item.distance.toFixed(1)} mi</span>
-        <span className={'badge ' + waitClass(item.wait)}>{item.wait} min wait</span>
+        <span className="cell cell-dist">{dist.toFixed(1)} mi</span>
+        <span className={'badge ' + waitClass(item.wait)}>{formatWaitTime(item.wait)} wait</span>
       </div>
     );
   }
 
   // kind === 'slot'
   return (
-    <div className={'row' + (highlighted ? ' hi' : '')}>
+    <div className={'row' + (highlighted ? ' hi' : '')} title={`Availability score: ${score}`}>
       <span className="cell cell-date">{item.date}</span>
       <span className="cell cell-time">{item.time}</span>
       <span className="cell cell-office">{item.office}</span>
       <span className="cell cell-service">{item.service}</span>
+      <span className="cell cell-dist">{dist.toFixed(1)} mi</span>
     </div>
   );
 }
@@ -127,8 +184,37 @@ export default function DmvList({ pageId, title, iters, steps, strategy, items, 
 
   const visible = strategy === 'windowed' ? filtered.slice(hi, hi + 50) : filtered;
 
+  // Navigate between pages by rewriting the hash and doing a full reload
+  // (main.jsx reads the route from the hash once at startup, so a reload is
+  // what actually swaps the page).
+  const goToPage = (page) => (e) => {
+    e.preventDefault();
+    const params = new URLSearchParams(location.hash.slice(1));
+    params.set('page', page);
+    location.hash = params.toString();
+    location.reload();
+  };
+
   return (
     <div className="dmv">
+      {/* Top navigation bar */}
+      <nav className="dmv-nav">
+        <a
+          href="#page=a"
+          className={'dmv-nav-link' + (pageId === 'a' ? ' active' : '')}
+          onClick={goToPage('a')}
+        >
+          Find office
+        </a>
+        <a
+          href="#page=b"
+          className={'dmv-nav-link' + (pageId === 'b' ? ' active' : '')}
+          onClick={goToPage('b')}
+        >
+          Book appointment
+        </a>
+      </nav>
+
       {/* State-of-California header bar */}
       <header className="dmv-header">
         <span className="dmv-header-text">
