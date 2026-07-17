@@ -52,6 +52,7 @@ export function DmvService({ config, variant = 'baseline' }) {
   const runRef = useRef(() => {});
   const phaseRef = useRef('idle');
   phaseRef.current = phase; // latest phase for the stable getState() closure
+  const calibrateRef = useRef(false); // when true, run the same path with ZERO model time (ruler calibration)
 
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
   const push = (t) => timers.current.push(t);
@@ -67,8 +68,12 @@ export function DmvService({ config, variant = 'baseline' }) {
     const done = new Promise((res) => { settleResolver.current = res; });
 
     if (outcome === 'success') {
-      const sch = schedule(config.components, variant);
-      config.components.forEach((c) => {
+      // Calibration run: same React + timer path, but zero model time, so elapsed ≈ pure harness overhead.
+      const comps = calibrateRef.current
+        ? config.components.map((c) => ({ id: c.id, dur: 0, fee: c.fee }))
+        : config.components;
+      const sch = schedule(comps, variant);
+      comps.forEach((c) => {
         push(setTimeout(() => {
           setResolved((prev) => new Set(prev).add(c.id));
           if (c.fee) setRunning((r) => r + c.fee);
@@ -113,7 +118,18 @@ export function DmvService({ config, variant = 'baseline' }) {
       speed.current = 1;
       return { ms: elapsed, settleModelMs: schedule(config.components, variant).settle };
     };
-    window.__benchfirst = { profile, runInteraction };
+    // Ruler calibration: run the identical path with zero model time → elapsed ≈ fixed harness overhead.
+    const overhead = async () => {
+      calibrateRef.current = true;
+      speed.current = SPEED_BENCH;
+      const t0 = performance.now();
+      await runRef.current();
+      const elapsed = performance.now() - t0;
+      speed.current = 1;
+      calibrateRef.current = false;
+      return elapsed;
+    };
+    window.__benchfirst = { profile, runInteraction, overhead };
     window.__runInteraction = runInteraction; // back-compat with bench/harness.mjs
     window.__ready = true;
     return () => { window.__ready = false; clearTimers(); };

@@ -6,7 +6,7 @@
 //     ->  refuse "done" until best beats baseline  ->  write result back to memory
 //
 import { signature } from '../bench/signature.mjs';
-import { measure, readProfile } from '../bench/harness.mjs';
+import { measure, measureOverhead, readProfile } from '../bench/harness.mjs';
 import * as memory from '../memory/store.mjs';
 
 const THRESHOLD = 20; // a candidate must cut time-to-settled by >=20% to count as a real win
@@ -22,6 +22,11 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
   const mem = memory.load();
   const known = mem[sig];
 
+  // Calibrate the ruler: measure the harness's fixed overhead, then subtract it so the
+  // cut reflects the app, not the test rig (#1). `adj` is the app-attributable time.
+  const overhead = await measureOverhead(browser, url, pageId);
+  const adj = (ms) => Math.max(1, ms - overhead);
+
   // 1. Baseline benchmark — the number every candidate must beat.
   const baseline = await measure(browser, url, pageId, 'baseline', runs);
 
@@ -29,7 +34,9 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
     pageId,
     signature: sig,
     warmStarted: !!known,
+    overheadMs: +overhead.toFixed(1),
     baselineMs: +baseline.mean.toFixed(1),
+    baselineAdjMs: +adj(baseline.mean).toFixed(1),
     baselineCov: baseline.cov,
     candidates: [],
     benchRuns: baseline.n,
@@ -55,7 +62,15 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
   for (const strat of order) {
     const m = await measure(browser, url, pageId, strat, runs);
     report.benchRuns += m.n;
-    const deltaPct = ((baseline.mean - m.mean) / baseline.mean) * 100;
+    // Calibrated measured cut (overhead removed).
+    const calDelta = ((adj(baseline.mean) - adj(m.mean)) / adj(baseline.mean)) * 100;
+    // Physical ceiling: a fix cannot settle faster than its longest component, so the cut can't
+    // exceed the structural (model) cut. Capping here removes the over-subtraction overshoot on
+    // fast variants without letting the model inflate anything — min() only ever lowers.
+    const modelDelta = baseline.settleModelMs
+      ? ((baseline.settleModelMs - m.settleModelMs) / baseline.settleModelMs) * 100
+      : calDelta;
+    const deltaPct = Math.min(calDelta, modelDelta);
     const beat = deltaPct >= THRESHOLD;
     report.candidates.push({
       strategy: strat,

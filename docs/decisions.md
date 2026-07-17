@@ -16,12 +16,10 @@ bottom — I hold on those until you answer.
 | D7 | `confidence` = **explicit emitted field** | consumers read it, don't re-derive | leave it derived | **you** (formula: me) | accepted |
 | D9 | Determinism gate = **cov ≤ 0.08** | inherited from the Phase-0 probe that gated the whole build | pick another band | me / probe | accepted |
 
-## Open — need your call (I'm holding)
-| # | Decision | My proposal | Options | For |
-|---|---|---|---|---|
-| D8 | **`CONF_MIN`** — the confidence floor splitting `success` from `low-confidence` | **0.5** (coin-flip floor) | 0.5 · 0.6 · 0.7 · other | state matrix / ship rule |
-| D10 | **The ship number** (Loop 3, acceptance = behavior) | see Loop 3 options | — | what "done" means for v1 |
-| D11 | `confidence` formula | `covTrust × marginTrust` (both must be high) | product · weighted avg · min | how strict confidence is |
+| D8 | **`CONF_MIN` = 0.5** — floor splitting `success` from `low-confidence` | coin-flip floor; below it a win is as likely noise as signal | 0.6 / 0.7 (stricter) | **you** | accepted |
+| D10 | **Ship bar = composite** (spec/acceptance.md) | measured, defensible; already mostly checked by the demo | single headline metric | **you** | accepted |
+| D11 | **`confidence` = covTrust × marginTrust** (product) | a shaky benchmark never reads confident, however big the win | weighted avg / min | **you** | accepted |
+| D12 | Ship clause 2 = **≥60%**, made honest by **calibrating the ruler** (measure & subtract harness overhead) + **capping at the structural limit** | don't lower the goalpost — fix the instrument; the cut then holds ~62–66% (Appointments) / ~84% (Registration) | lower floor to 50% (goalpost-moving) · model-only | **you** (#1+#3) + me | accepted |
 
 > Convention going forward: each loop's key decision lands here as **proposed** first; I build only
 > after you accept (or edit) it.
