@@ -1,0 +1,19 @@
+# Keep the build context lean and the image clean. Build context is the repo
+# root (akash/writer/Dockerfile copies memory/ + schema/), so exclude the heavy
+# and the sensitive: deps, VCS, build output, and any runtime scar data.
+node_modules
+.git
+dist
+*.log
+**/.DS_Store
+
+# Runtime memory — never bake scar data into the writer image (cold start = cold).
+memory/memory.json
+
+# Not needed inside the writer image.
+src
+bench
+optimizer
+scripts
+docs
+akash/preflight

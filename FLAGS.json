@@ -169,7 +169,7 @@
       "task": "i6 preflight (run by Isha outside this session)",
       "title": "Akash cannot host the benchmark — preflight CoV gate failed on every viable lease",
       "detail": "Preflight harness (akash/preflight/, image ishamishra0408/akash-preflight:v2): local Mac CoV 0.029 PASS; Akash ZenCloud never booted; overclock-southwest 1CPU CoV 0.414 FAIL; overclock-west 4CPU CoV 0.178 FAIL — all far above the 0.08 gate. Resolution: Path B — benchmark runs on Isha's Mac (the proven 0.029 environment); Akash instead hosts the WRITER + Pomerium, so the trust story becomes 'write-path enforced on decentralized compute'. The three CoV numbers are pitch evidence: the foundation was tested before being built on.",
-      "files": ["akash/preflight/harness.mjs", "akash/preflight/Dockerfile", "akash/deploy.yaml"],
+      "files": ["akash/preflight/harness.mjs", "akash/preflight/Dockerfile", "akash/preflight/deploy.yaml"],
       "action": "None — decision made and documented; revised i5/i7 execute Path B"
     },
     {
@@ -194,6 +194,28 @@
       "detail": "The shared plan's task text now contradicts reality: i5 says 'Containerize app + harness' (now: containerize the writer service), i6 says 'gate CoV on the Akash lease' (preflight done, verdict: Akash can't host the bench), i7 says deploy-with-CoV-requirement (now: deploy writer, no CoV requirement). The plan is a shared artifact with Devansh; not edited unilaterally.",
       "files": ["docs/build-plan.html"],
       "action": "Isha confirms, then update the plan text (and tell Devansh the trust-story framing changed for his d6 pitch script)"
+    },
+    {
+      "id": "F17",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-18",
+      "task": "i5 (Step 3)",
+      "title": "Pomerium half of the pair can't be booted or tested locally — needs i7 IdP + secrets",
+      "detail": "i5 containerized the WRITER and proved it end-to-end in Docker (build -> run -> healthz {ok:true}, POST no-identity 403, wrong-identity 403, correct-identity 200, opinion 400, GET 405, docker HEALTHCHECK healthy). But real Pomerium requires an IdP + cookie/shared secrets + signing key, none of which exist until i7 — so the docker-compose `pomerium` service sits under a `full` profile and the Akash SDL's pomerium service is structurally complete but unrun. What is UNVERIFIED until i7: that Pomerium actually boots with pomerium/config.yaml, that pass_identity_headers emits x-pomerium-claim-email, and that the writer is reachable ONLY via Pomerium (network isolation). The gate is proven at the writer layer, asserted (not yet demonstrated) at the proxy layer.",
+      "files": ["akash/writer/docker-compose.yaml", "akash/deploy.yaml", "pomerium/config.yaml"],
+      "action": "i7: fill secrets/IdP, boot Pomerium against an echo upstream to confirm the header name, then run the full pair on an Akash lease"
+    },
+    {
+      "id": "F18",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-18",
+      "task": "i5 (Step 3)",
+      "title": "Writer image is amd64-pinned in FROM; unverified assumptions for the live deploy",
+      "detail": "akash/writer/Dockerfile pins FROM --platform=linux/amd64 (Docker lint warns; deliberate — Akash providers are x86_64, matches the preflight image). Built + ran on the Apple-Silicon Mac via emulation (317MB image, boots fine). Unverified until i7/deploy: (a) the image running natively on an amd64 Akash provider; (b) the Akash SDL's service-to-service expose (`writer` exposed only `to: [service: pomerium]`) actually isolates the writer from global ingress on the chosen provider; (c) resource profile (0.5 cpu / 256Mi writer, 0.5 / 512Mi pomerium) is enough for Pomerium. Push the image (i7) before deploy — the SDL references ishamishra0408/benchfirst-writer:v1 which is not yet published.",
+      "files": ["akash/writer/Dockerfile", "akash/deploy.yaml"],
+      "action": "i7: docker push the writer image; verify service-to-service isolation + Pomerium resources on the live lease"
     },
     {
       "id": "R1",

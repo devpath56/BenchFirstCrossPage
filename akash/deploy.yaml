@@ -1,34 +1,78 @@
 ---
+# akash/deploy.yaml — Path B deployment: the verdict WRITER fronted by Pomerium.
+#
+# NOT the benchmark (the Akash preflight, akash/preflight/, proved Akash can't hold
+# CoV<=0.08 — the bench stays on the local Mac). Akash instead hosts the write path,
+# so the trust story is "verdict-only write enforced on decentralized compute".
+#
+# i7 fill-ins (do NOT commit real values): push the writer image + tag; supply the
+# Pomerium secrets/IdP/domain as env; add the signing key. `pomerium` accepts global
+# ingress; `writer` is expose-d only to `pomerium` (service-to-service), never global —
+# that network isolation is what makes the identity gate real (FLAGS F13).
 version: "2.0"
 
 services:
-  service-1:
-    image: ishamishra0408/akash-preflight:v2
+  writer:
+    image: ishamishra0408/benchfirst-writer:v1   # i7: docker push this tag first
+    env:
+      - BENCHFIRST_WRITER_HOST=0.0.0.0
+      - BENCHFIRST_WRITER_PORT=8787
+      # i7 (secrets, set via CLI/console — not in this file):
+      # - BENCHFIRST_S3_BUCKET=...
+      # - BENCHFIRST_VERDICT_IDENTITY=verdict-runner@...   # backstop ON, fail-closed
+      # - AWS_ACCESS_KEY_ID=... / AWS_SECRET_ACCESS_KEY=... # scoped s3:PutObject only
     expose:
-      - port: 8080
-        as: 80
+      - port: 8787
+        to:
+          - service: pomerium     # internal only — Pomerium is the sole ingress
+
+  pomerium:
+    image: pomerium/pomerium:v0.28.0
+    depends_on:
+      - writer
+    expose:
+      - port: 443
+        as: 443
+        accept:
+          - verdict.benchfirst.example    # i7: real hostname
         to:
           - global: true
+    # i7: mount/inject pomerium/config.yaml + signing key + secrets (env or params).
 
 profiles:
   compute:
-    service-1:
+    writer:
       resources:
         cpu:
-          units: 4
+          units: 0.5
         memory:
-          size: 1Gi
+          size: 256Mi
         storage:
-          size: 1Gi
+          size: 512Mi
+    pomerium:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 512Mi
+        storage:
+          size: 512Mi
   placement:
     dcloud:
       pricing:
-        service-1:
+        writer:
           denom: uakt
-          amount: 100000
+          amount: 10000
+        pomerium:
+          denom: uakt
+          amount: 10000
 
 deployment:
-  service-1:
+  writer:
     dcloud:
-      profile: service-1
+      profile: writer
+      count: 1
+  pomerium:
+    dcloud:
+      profile: pomerium
       count: 1

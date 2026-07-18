@@ -1,0 +1,47 @@
+# akash/writer/docker-compose.yaml — local pair test of the Path B write stack.
+#
+# Run from the REPO ROOT:  docker compose -f akash/writer/docker-compose.yaml up --build
+#
+# What works locally NOW: the `writer` service boots, serves /healthz, and enforces
+# the identity backstop (simulate Pomerium's injected header with curl, below).
+# The `pomerium` service is wired but stays under the `full` profile because real
+# Pomerium needs an IdP + secrets that land at i7 — until then, test the writer
+# directly and mimic the header Pomerium would inject.
+services:
+  writer:
+    build:
+      context: ../..                       # repo root, so memory/ + schema/ are in scope
+      dockerfile: akash/writer/Dockerfile
+    image: benchfirst-writer:local
+    environment:
+      BENCHFIRST_WRITER_HOST: 0.0.0.0
+      BENCHFIRST_WRITER_PORT: "8787"
+      # Turn the identity backstop ON for the pair test (fail-closed). With Pomerium
+      # in front (profile: full) this is the same identity the allow-policy admits.
+      BENCHFIRST_VERDICT_IDENTITY: verdict-runner@benchfirst.example
+      # No BENCHFIRST_S3_BUCKET → local-JSON fallback inside the container (ephemeral).
+    ports:
+      - "8787:8787"                        # expose directly ONLY for local testing
+    # Local-test gate check (no Pomerium):
+    #   curl -s localhost:8787/healthz
+    #   curl -s -XPOST localhost:8787/verdict -d '{}'                       # → 403 (no identity)
+    #   curl -s -XPOST localhost:8787/verdict \
+    #     -H 'x-pomerium-claim-email: verdict-runner@benchfirst.example' \
+    #     -H 'content-type: application/json' \
+    #     -d '{"signature":"waterfall-load","record":{"winner":"parallel","candidates":{"parallel":{"deltaPct":63,"beat":true}}}}'
+
+  # i7: fill pomerium/config.yaml placeholders + provide secrets, then:
+  #   docker compose -f akash/writer/docker-compose.yaml --profile full up
+  # In the deployed topology the writer is NOT published to the host — Pomerium is
+  # the only ingress (remove the writer `ports:` mapping above for a real deploy).
+  pomerium:
+    image: pomerium/pomerium:v0.28.0
+    profiles: ["full"]
+    depends_on: [writer]
+    volumes:
+      - ../../pomerium/config.yaml:/pomerium/config.yaml:ro
+      # - ./signing-key.pem:/pomerium/signing-key.pem:ro   # i7: generated EC key
+    ports:
+      - "443:443"
+    # Secrets (cookie_secret, shared_secret, IdP client id/secret, BENCHFIRST_DOMAIN,
+    # BENCHFIRST_VERDICT_IDENTITY) come from an env_file at i7 — never committed.
