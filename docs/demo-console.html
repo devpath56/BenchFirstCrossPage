@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<title>BenchFirst — demo console</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161c25; --panel-2:#1c2531; --ink:#e8eef6; --muted:#93a1b3; --line:#28313d;
+    --blue:#3b82f6; --gold:#e6b23c; --green:#37c26d; --red:#e5564b; --violet:#8b5cf6;
+    --dmv-navy:#13294b; --dmv-blue:#1c5a9c; --dmv-gold:#fdb913;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme:light){
+    :root{ --bg:#eef1f5; --panel:#ffffff; --panel-2:#f5f8fb; --ink:#16202c; --muted:#5a6a7b; --line:#dde4ec; }
+  }
+  :root[data-theme="light"]{ --bg:#eef1f5; --panel:#ffffff; --panel-2:#f5f8fb; --ink:#16202c; --muted:#5a6a7b; --line:#dde4ec; }
+  :root[data-theme="dark"]{ --bg:#0e1116; --panel:#161c25; --panel-2:#1c2531; --ink:#e8eef6; --muted:#93a1b3; --line:#28313d; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);height:100vh;overflow:hidden}
+  .app{display:grid;grid-template-columns:auto 1fr;height:100vh}
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);border-radius:9px;font-size:13px;padding:8px 12px;transition:.15s}
+  button:hover{border-color:var(--muted)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:650}
+  button.gold{background:var(--gold);border-color:var(--gold);color:#1a1200;font-weight:650}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  /* ---- control pane ---- */
+  .pane{width:290px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;transition:width .25s;overflow:hidden}
+  .pane.collapsed{width:52px}
+  .pane-hd{display:flex;align-items:center;gap:9px;padding:14px 14px 10px}
+  .pane-hd .logo{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,var(--blue),var(--violet));flex:none}
+  .pane-hd b{font-size:14px;letter-spacing:-.01em;white-space:nowrap}
+  .pane.collapsed .hide{display:none}
+  .collapse{margin-left:auto;background:none;border:none;color:var(--muted);padding:4px 6px}
+  .pane-body{padding:6px 14px 14px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+
+  .flow{display:flex;flex-direction:column;gap:2px}
+  .step{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--muted);padding:6px 8px;border-radius:8px}
+  .step .n{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:10px;flex:none}
+  .step.on{color:var(--ink);background:var(--panel-2)}
+  .step.on .n{border-color:var(--blue);color:var(--blue)}
+  .step.done .n{background:var(--green);border-color:var(--green);color:#04240f}
+
+  .runbtn{width:100%;justify-content:center;padding:11px}
+  .looplog{display:flex;flex-direction:column;gap:6px}
+  .looprow{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+  .looprow .lc{font-family:var(--mono);color:var(--muted)}
+  .looprow .cand{flex:1;font-family:var(--mono)}
+  .looprow .sc{font-family:var(--mono);font-weight:700}
+  .looprow.win{border-color:var(--green)}
+  .looprow.lose{opacity:.6}
+
+  .gauge{height:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .gauge i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--red),var(--gold),var(--green));transition:width .4s}
+  .gauge-lbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:5px}
+
+  .decide-actions{display:flex;flex-direction:column;gap:8px}
+
+  /* ---- stage ---- */
+  .stage{position:relative;padding:16px;overflow:auto}
+  .stage-hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .stage-hd h1{font-size:16px;margin:0;letter-spacing:-.01em}
+  .chip{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:20px;background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+  .chip.bad{color:var(--red);border-color:transparent;background:rgba(229,86,75,.14)}
+  .chip.good{color:var(--green);border-color:transparent;background:rgba(55,194,109,.14)}
+  .spacer{flex:1}
+
+  /* website mini */
+  .site{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;color:#1f2933;position:relative}
+  .site .topbar{height:3px;background:var(--dmv-gold)}
+  .site .mast{background:#fff;padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e6ebf0}
+  .site .seal{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#e9c34a,#b8891b)}
+  .site .mast b{color:var(--dmv-blue);font-size:12px}
+  .site .nav{background:var(--dmv-blue);color:#dce7f3;font-size:10px;padding:5px 12px}
+  .site .body{padding:12px}
+  .site h2{margin:0 0 8px;font-size:12px;color:var(--dmv-blue)}
+  .feerow{display:flex;justify-content:space-between;font-size:11px;padding:6px 8px;border-bottom:1px solid #eef1f4;color:#3f4d59}
+  .feerow .amt{font-variant-numeric:tabular-nums}
+  .skl{background:linear-gradient(100deg,#e7ebee 30%,#f3f5f7 50%,#e7ebee 70%);background-size:200% 100%;animation:sh 1.3s linear infinite;border-radius:3px;height:11px}
+  .feerow.sk .lbl{width:120px} .feerow.sk .amt{width:44px}
+  .fadein{animation:fi .4s ease both}
+  .total{display:flex;justify-content:space-between;font-size:12px;font-weight:700;padding:8px;background:#f7faf7;border-top:1px solid #e6ebf0}
+  .total .amt{color:var(--green)} .total .amt.bad{color:var(--red)}
+  .siteclock{position:absolute;top:6px;right:8px;font-family:var(--mono);font-size:10px;background:rgba(0,0,0,.6);color:#fff;padding:2px 6px;border-radius:10px}
+  .tag{position:absolute;top:8px;left:8px;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
+  .tag.before{background:#eceff3;color:#5a6a7b} .tag.after{background:var(--green);color:#04240f}
+
+  /* layouts */
+  .stage.pain .single{max-width:520px;margin:8px auto}
+  .win-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-rows:auto 1fr;gap:14px;height:calc(100% - 42px)}
+  .before-wrap{grid-column:1;grid-row:1}
+  .after-wrap{grid-column:1;grid-row:2}
+  .decide{grid-column:2;grid-row:1/3;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+  .before-wrap .site{max-width:300px}
+  .before-wrap .label,.after-wrap .label{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em}
+
+  .decide h3{margin:0;font-size:15px;letter-spacing:-.01em}
+  .rec{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:13px;padding:5px 11px;border-radius:8px;align-self:flex-start}
+  .rec.ship{background:rgba(55,194,109,.16);color:var(--green)}
+  .rec.review{background:rgba(230,178,60,.16);color:var(--gold)}
+  .drow{border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--panel-2)}
+  .drow .rt{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:650}
+  .drow .rt .k{font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:auto}
+  .drow .rv{font-size:12px;color:var(--muted);margin-top:5px}
+  .drow.ok{border-left:3px solid var(--green)} .drow.bad{border-left:3px solid var(--red)}
+  .mark{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:10px;flex:none;color:#fff}
+  .mark.ok{background:var(--green)} .mark.bad{background:var(--red)}
+  .toast{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--green);color:#04240f;font-weight:700;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:.3s;pointer-events:none}
+  .toast.show{opacity:1}
+  .prev-toggle{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--muted)}
+  .prev-toggle button{padding:4px 9px;font-size:11px}
+  .prev-toggle button.active{background:var(--violet);border-color:var(--violet);color:#fff}
+
+  @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  @keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="app">
+  <!-- CONTROL PANE -->
+  <aside class="pane" id="pane">
+    <div class="pane-hd">
+      <span class="logo"></span>
+      <b class="hide">BenchFirst</b>
+      <button class="collapse" id="collapse" title="Collapse">‹</button>
+    </div>
+    <div class="pane-body hide">
+      <div class="flow" id="flow">
+        <div class="step on" data-s="diagnose"><span class="n">1</span>Diagnose</div>
+        <div class="step" data-s="optimize"><span class="n">2</span>Optimize (loops)</div>
+        <div class="step" data-s="decide"><span class="n">3</span>Decide</div>
+        <div class="step" data-s="ship"><span class="n">4</span>Ship</div>
+      </div>
+
+      <button class="primary runbtn" id="run">▶ Run optimizer</button>
+
+      <div id="loopbox" style="display:none">
+        <div class="gauge-lbl"><span>best score</span><span id="scoreN">—</span></div>
+        <div class="gauge"><i id="gauge"></i></div>
+        <div class="looplog" id="looplog" style="margin-top:10px"></div>
+      </div>
+
+      <div id="decidebox" style="display:none">
+        <div class="decide-actions">
+          <button class="gold" id="approve">✓ Approve &amp; ship</button>
+          <button id="review">Send for review</button>
+          <button id="reset">↺ Reset demo</button>
+        </div>
+        <div class="prev-toggle" style="margin-top:4px">
+          preview: <button id="pv-happy" class="active">happy</button>
+          <button id="pv-fail">graceful fail</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- STAGE -->
+  <main class="stage pain" id="stage">
+    <div class="stage-hd" id="stageHd">
+      <h1 id="stageTitle">DMV · Vehicle Registration</h1>
+      <span class="chip bad" id="diagChip">◷ 5.7s · 7 serial fetches</span>
+      <span class="spacer"></span>
+    </div>
+    <div id="stageMain"></div>
+    <div class="toast" id="toast"></div>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s,r){return (r||document).querySelector(s)};
+  var pane=$("#pane"), stage=$("#stage"), stageMain=$("#stageMain");
+  var mode="happy"; // happy | fail
+
+  // ---- a mini DMV "website" that loads slow or fast ----
+  var FEES=[["Registration Fee",46],["CHP Fee",28],["Vehicle License Fee",112],["County / District",18],["Smog Abatement",20]];
+  function siteHTML(tag){
+    var rows=FEES.map(function(f,i){return '<div class="feerow sk" data-fee="'+i+'"><span class="skl lbl"></span><span class="skl amt"></span></div>';}).join("");
+    return '<div class="site">'+
+      (tag?'<span class="tag '+tag+'">'+(tag==='before'?'BEFORE':'AFTER')+'</span>':'')+
+      '<span class="siteclock" data-clock>0.0s</span>'+
+      '<div class="topbar"></div><div class="mast"><span class="seal"></span><b>California DMV</b></div>'+
+      '<div class="nav">Vehicle Registration</div>'+
+      '<div class="body"><h2>Renew Vehicle Registration</h2>'+rows+
+      '<div class="total"><span>Amount Due</span><span class="amt" data-total>$—</span></div></div></div>';
+  }
+  function loadSite(el, opts){
+    // opts: {step:ms between fees, drop:n dropped fees (fail), onDone}
+    var clock=el.querySelector("[data-clock]"), total=el.querySelector("[data-total]");
+    var t0=performance.now(), timers=[], running=0, shown=0;
+    var keep=FEES.length-(opts.drop||0);
+    var tick=setInterval(function(){ clock.textContent=((performance.now()-t0)/1000).toFixed(1)+"s"; },80);
+    timers.push(tick);
+    for(var i=0;i<FEES.length;i++){(function(i){
+      if(i>=keep) return; // dropped in fail mode
+      timers.push(setTimeout(function(){
+        var row=el.querySelector('[data-fee="'+i+'"]');
+        row.classList.remove("sk"); row.classList.add("fadein");
+        row.innerHTML='<span>'+FEES[i][0]+'</span><span class="amt">$'+FEES[i][1].toFixed(2)+'</span>';
+        running+=FEES[i][1]; total.textContent='$'+running.toFixed(2); shown++;
+      }, opts.step*(i+1)));
+    })(i);}
+    timers.push(setTimeout(function(){
+      clearInterval(tick);
+      var secs=(performance.now()-t0)/1000; clock.textContent=secs.toFixed(1)+"s";
+      if(opts.drop){ total.classList.add("bad"); }
+      opts.onDone&&opts.onDone();
+    }, opts.step*(keep+1)+150));
+    el._timers=timers;
+    return el;
+  }
+  function clearSite(el){ if(el&&el._timers) el._timers.forEach(function(t){clearTimeout(t);clearInterval(t);}); }
+
+  // ---- phases ----
+  var cur=[];
+  function setStep(name){
+    var order=["diagnose","optimize","decide","ship"], idx=order.indexOf(name);
+    $("#flow").querySelectorAll(".step").forEach(function(s){
+      var i=order.indexOf(s.getAttribute("data-s"));
+      s.classList.toggle("on", i===idx); s.classList.toggle("done", i<idx);
+    });
+  }
+  function toast(msg){ var t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(function(){t.classList.remove("show");},2600); }
+
+  function toPain(){
+    mode="happy"; $("#pv-happy").classList.add("active"); $("#pv-fail").classList.remove("active");
+    stage.className="stage pain"; setStep("diagnose");
+    $("#stageTitle").textContent="DMV · Vehicle Registration";
+    $("#diagChip").style.display=""; $("#diagChip").className="chip bad"; $("#diagChip").textContent="◷ 5.7s · 7 serial fetches";
+    $("#loopbox").style.display="none"; $("#decidebox").style.display="none"; $("#run").style.display="";
+    cur.forEach(clearSite); cur=[];
+    stageMain.innerHTML='<div class="single"><div class="label" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">the live site — watch it crawl</div>'+siteHTML(null)+'</div>';
+    var el=stageMain.querySelector(".site"); cur=[el];
+    loadSite(el,{step:900});
+  }
+
+  function runLoops(){
+    setStep("optimize"); $("#run").style.display="none"; $("#loopbox").style.display="";
+    var log=$("#looplog"); log.innerHTML="";
+    var loops = mode==="fail"
+      ? [["parallel",96,"win"],["spinner",41,"lose"],["lossy",99,"win"]]  // lossy scores highest on speed alone
+      : [["parallel",96,"win"],["spinner",41,"lose"]];
+    var best=0,i=0;
+    (function next(){
+      if(i>=loops.length){ setTimeout(toWin,500); return; }
+      var L=loops[i], row=document.createElement("div");
+      row.className="looprow "+(L[2]==="lose"?"lose":"");
+      row.innerHTML='<span class="lc">L'+(i+1)+'</span><span class="cand">'+L[0]+'</span><span class="sc">'+L[1]+'</span>';
+      log.appendChild(row);
+      if(L[1]>best){ best=L[1]; $("#gauge").style.width=best+"%"; $("#scoreN").textContent=best; }
+      i++; setTimeout(next, 650);
+    })();
+  }
+
+  function decisionData(){
+    if(mode==="fail"){
+      return { rec:"review", winner:"lossy",
+        rows:[
+          ["Impact","5.7s → 1.6s · −72%","ok","measured"],
+          ["Provenance","deterministic · CoV 1.1% · gate ✓","ok","real?"],
+          ["Nothing else broke","✗ dropped 2 fees — Amount Due $204 (should be $224)","bad","safe?"]
+        ]};
+    }
+    return { rec:"ship", winner:"parallel",
+      rows:[
+        ["Impact","5.7s → 1.9s · −66%","ok","measured"],
+        ["Provenance","deterministic · CoV 0.9% · gate ✓ · 3× margin","ok","real?"],
+        ["Nothing else broke","✓ all 5 fees render · Amount Due $224 · no new errors","ok","safe?"]
+      ]};
+  }
+
+  function toWin(){
+    setStep("decide"); stage.className="stage win";
+    $("#diagChip").style.display="none"; $("#decidebox").style.display="";
+    var d=decisionData();
+    $("#stageTitle").textContent="Candidate found: "+d.winner;
+    var rowsHTML=d.rows.map(function(r){
+      var ok=r[2]==="ok";
+      return '<div class="drow '+(ok?"ok":"bad")+'"><div class="rt"><span class="mark '+(ok?"ok":"bad")+'">'+(ok?"✓":"✗")+'</span>'+r[0]+'<span class="k">'+r[3]+'</span></div><div class="rv">'+r[1]+'</div></div>';
+    }).join("");
+    stageMain.innerHTML=
+      '<div class="win-grid">'+
+        '<div class="before-wrap"><div class="label">before · kept small for reference</div>'+siteHTML("before")+'</div>'+
+        '<div class="after-wrap"><div class="label">after · the improving site</div>'+siteHTML("after")+'</div>'+
+        '<div class="decide"><span class="rec '+d.rec+'">'+(d.rec==="ship"?"● Recommendation: SHIP":"▲ Recommendation: REVIEW")+'</span>'+
+          '<h3>Should this patch ship?</h3>'+rowsHTML+
+          '<div class="rv" style="font-size:11.5px;color:var(--muted)">Decision report — the human approves with eyes open, not on blind trust.</div>'+
+        '</div>'+
+      '</div>';
+    // reload BOTH together — before (small, slow) and after (big, fast)
+    var before=stageMain.querySelector(".before-wrap .site"), after=stageMain.querySelector(".after-wrap .site");
+    cur=[before,after];
+    loadSite(before,{step:900});
+    loadSite(after,{step:120, drop: mode==="fail"?2:0});
+    // approve gating
+    $("#approve").disabled = d.rec!=="ship";
+    $("#approve").title = d.rec==="ship" ? "" : "Blocked — recommendation is REVIEW";
+  }
+
+  // ---- events ----
+  $("#collapse").addEventListener("click",function(){ pane.classList.toggle("collapsed"); this.textContent=pane.classList.contains("collapsed")?"›":"‹"; });
+  $("#run").addEventListener("click",runLoops);
+  $("#reset").addEventListener("click",toPain);
+  $("#approve").addEventListener("click",function(){ if(this.disabled)return; setStep("ship"); toast("✓ Patch shipped — DMV Registration now loads in 1.9s"); });
+  $("#review").addEventListener("click",function(){ toast("Sent for human review — nothing auto-shipped"); });
+  $("#pv-happy").addEventListener("click",function(){ mode="happy"; this.classList.add("active"); $("#pv-fail").classList.remove("active"); toWin(); });
+  $("#pv-fail").addEventListener("click",function(){ mode="fail"; this.classList.add("active"); $("#pv-happy").classList.remove("active"); toWin(); });
+
+  toPain();
+})();
+</script>
+</body></html>
