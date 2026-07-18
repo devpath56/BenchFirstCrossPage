@@ -1,0 +1,229 @@
+{
+  "purpose": "Running log of every failure, flag, and warning found during the build, for Isha to review. Maintained by Claude as tasks execute; entries are never deleted, only marked resolved.",
+  "updated": "2026-07-18",
+  "severity_legend": {
+    "FAILURE": "something is broken or failing a check right now",
+    "FLAG": "a decision or verification Isha must make before a later task depends on it",
+    "WARNING": "a latent risk; not broken today, could bite later"
+  },
+  "entries": [
+    {
+      "id": "F1",
+      "severity": "FAILURE",
+      "status": "decision-needed",
+      "logged": "2026-07-17",
+      "task": "i1 (discovered during), pre-existing on clean HEAD",
+      "title": "Offline demo fails its own acceptance checks (Page B parallel misses the 20% bar)",
+      "detail": "npm run demo reproducibly fails 2/6 checks: Page B's parallel fix measures only ~13-16% time-to-settled cut vs the 20% THRESHOLD (CoV ~1%, systematic). Verified pre-existing: clean HEAD (git stash) fails identically. Mechanism (audit-verified): SPEED_BENCH=40 compresses Page B's parallel settle model to 52.5ms, but ~75ms of fixed render/timer overhead per run (4x CPU throttle) swamps it; the 145ms baseline absorbs the overhead, so only parallel inflates and the delta collapses from a modeled 64% to ~15%. Page A survives because its parallel long-pole is 900ms vs Page B's 1900ms map.",
+      "files": ["src/pages/dmvlist.jsx:16", "src/pages/pageB.jsx:24", "optimizer/loop.mjs:13", "scripts/demo.mjs:50-67"],
+      "options": [
+        "Lower SPEED_BENCH from 40 to ~10 (recommended: fixes the physics; demo runs ~4x longer)",
+        "Shrink Page B's map dur (changes the substrate story)",
+        "Lower THRESHOLD below 20% (moves the goalposts; touches Devansh's d4 ship number)"
+      ],
+      "action": "Isha + Devansh decide calibration (ties to d4 'confirm the number'), then re-verify 6/6 PASS"
+    },
+    {
+      "id": "F2",
+      "severity": "FLAG",
+      "status": "open",
+      "logged": "2026-07-17",
+      "task": "i0",
+      "title": "Canonical bench surface undecided: __benchfirst vs back-compat aliases",
+      "detail": "bench/harness.mjs consumes window.__runInteraction and window.__profile (the aliases), not window.__benchfirst directly. Both are live, but the locked contract should name one canonical. Decide (or update the harness) before i3/i6 build on it.",
+      "files": ["bench/harness.mjs:67", "bench/harness.mjs:82", "src/pages/dmvlist.jsx:116-117"],
+      "action": "Pick canonical surface before starting i3"
+    },
+    {
+      "id": "F3",
+      "severity": "FLAG",
+      "status": "open",
+      "logged": "2026-07-17",
+      "task": "i0",
+      "title": "window.__dmv has zero code consumers — its stability is untested",
+      "detail": "Only README.md references __dmv; no script drives setInput/submit/getState. Also submit and submitAndSettle are identical closures (redundant surface member). Cheap test when a browser is open: setInput('vin','FAIL'); await submitAndSettle(); getState()==='error'.",
+      "files": ["src/pages/dmvlist.jsx:101-107", "README.md:69"],
+      "action": "Run the one-off playwright check; document or collapse submit/submitAndSettle"
+    },
+    {
+      "id": "F4",
+      "severity": "RESOLVED",
+      "status": "resolved",
+      "logged": "2026-07-17",
+      "resolved": "2026-07-17 by i3",
+      "task": "i0",
+      "title": "schema/verdict.json is unenforced until i3 — matches code by inspection only",
+      "detail": "Resolved: memory/writer.mjs now ajv-validates every write against schema/verdict.json (plus semantic checks), in-process and over HTTP. Residual schema looseness tracked separately as F11.",
+      "files": ["schema/verdict.json", "memory/writer.mjs"]
+    },
+    {
+      "id": "F5",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-17",
+      "task": "i1 audit",
+      "title": "Bedrock ranked list is not deduped — a duplicate name would be measured twice",
+      "detail": "picker.mjs `cleaned` keeps duplicates if Bedrock replies with a repeated candidate name; the loop would then benchmark that strategy twice. One-line fix: [...new Set(cleaned)].",
+      "files": ["optimizer/picker.mjs:46-47"],
+      "action": "Dedupe when next touching picker.mjs"
+    },
+    {
+      "id": "F6",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-17",
+      "task": "i1",
+      "title": "Bedrock live path never executed end-to-end (blocked on i7 credentials)",
+      "detail": "Offline fallback and error-fallback are verified; the success path (invoke, greedy \\[.*\\] regex parse of a possibly chatty reply, loser filter) is untested until AWS creds land. The greedy regex is the riskiest piece — mock-test it or tighten it before the i8 live capture.",
+      "files": ["optimizer/picker.mjs:18-36"],
+      "action": "Exercise once creds land (i7); consider unit-mocking bedrockRank before then"
+    },
+    {
+      "id": "F7",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-17",
+      "task": "i1",
+      "title": "Benchmark environment changed: fresh Chromium 141 installed",
+      "detail": "Playwright's chromium binary was missing on this machine and was freshly installed (headless shell 141, playwright build v1194). Whatever environment produced the historical 6/6 PASS no longer exists here. Related to F1; also relevant to i6's CoV gate on Akash (pin the environment there).",
+      "files": ["bench/harness.mjs:47-49"],
+      "action": "Recalibrate acceptance on THIS environment (with F1 decision); pin browser/CPU profile for i5/i6"
+    },
+    {
+      "id": "F8",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-17",
+      "task": "i2 audit",
+      "title": "Demo start wipes the shared S3 scar file when the bucket env is set",
+      "detail": "scripts/demo.mjs awaits memory.reset() at startup so 'cold' is honest — but once BENCHFIRST_S3_BUCKET is set, that reset PUTs {} over the durable shared S3 memory. Fine for a solo demo; destructive if the scar file ever accumulates real cross-session history. Consider requiring an explicit --reset flag (or a separate demo key) before the i8 live capture.",
+      "files": ["scripts/demo.mjs:71", "memory/s3-store.mjs"],
+      "action": "Decide reset semantics for the live (bucket-set) demo before i8"
+    },
+    {
+      "id": "F9",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-17",
+      "task": "i2",
+      "title": "S3 success path never executed end-to-end (blocked on i7 credentials)",
+      "detail": "Verified: local fallback round-trip, loud failure without credentials (CredentialsProviderError / missing region), corrupt-JSON rethrow, and NoSuchKey/NotFound-only cold start. Unverified until creds land: a real GET/PUT round-trip (including res.Body.transformToString on the locked SDK 3.1090) and the NoSuchBucket loud-throw. Also note: concurrent writers do last-write-wins (no ETag guard) — acceptable for the demo, worth knowing for i3.",
+      "files": ["memory/s3-store.mjs"],
+      "action": "On creds day (i7): run one real round-trip + nonexistent-bucket test before trusting the warm story"
+    },
+    {
+      "id": "F10",
+      "severity": "FAILURE",
+      "status": "decision-needed",
+      "logged": "2026-07-17",
+      "task": "i3 (observed during demo verification)",
+      "title": "Noisy local benchmark can mint FALSE verdicts — observed live",
+      "detail": "During an i3 demo run, Page A's baseline came in at 193ms with CoV 0.3481 (heavy machine noise, an outlier-inflated baseline). Against that inflated baseline, the cosmetic 'spinner' non-fix measured a 25.3% 'win' and was written to memory as beat=true — a schema-valid, semantically-valid verdict born entirely of noise. The writer cannot catch this: it validates shape and winner-beat consistency, not measurement quality. The loop has NO CoV gate; i6's preflight (CoV<=0.08) only guards the Akash lease, not local runs.",
+      "files": ["optimizer/loop.mjs:24-31", "bench/harness.mjs:78-93", "scripts/demo.mjs"],
+      "options": [
+        "Gate locally too: loop refuses to trust/write a verdict when baseline CoV > 0.08 (recommended; matches the d4 ship number and makes the trust story uniform)",
+        "Leave local ungated; treat local demo as illustrative only and rely on i6's Akash gate for real verdicts"
+      ],
+      "action": "Isha decides local CoV gating (ties to d4 and i6); note evidence lives in this entry",
+      "update_2026_07_18": "Path B pivot (see F14) makes this URGENT: the local Mac is now the OFFICIAL benchmark host, so an ungated local bench is the trust story's weakest link. The 0.029 preflight CoV was measured idle; this entry's 0.348 was the same Mac under load. Recommend: loop refuses verdicts when baseline CoV > 0.08, matching the preflight gate."
+    },
+    {
+      "id": "F11",
+      "severity": "FLAG",
+      "status": "decision-needed",
+      "logged": "2026-07-17",
+      "task": "i3 audit",
+      "title": "schema/verdict.json (locked i0 interface) is looser than the writer's gate",
+      "detail": "The schema alone accepts: empty candidates {}, empty-string signature, and arbitrary rider fields (no additionalProperties:false) — audit verified a free-text 'opinion' field rides a valid verdict into the store. The writer compensates with code-level semantic checks (non-empty measurements, winner must have beat=true, usable signature key), but the schema itself can't be tightened unilaterally — it's a locked i0 interface, so tightening (minProperties, minLength, additionalProperties:false) needs Devansh's sign-off since his d1/d5 tasks build against it.",
+      "files": ["schema/verdict.json", "memory/writer.mjs:24-42"],
+      "action": "Propose schema tightening at mentor review #1 / with Devansh; until then the writer's semantic layer is the real gate"
+    },
+    {
+      "id": "F12",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-17",
+      "task": "i3 audit",
+      "title": "Writer binds hardcoded 127.0.0.1 — unreachable as a containerized Pomerium upstream",
+      "detail": "Correct for local runs; wrong for i4/i5 if Pomerium and the writer run in separate containers (upstream would need 0.0.0.0 or an env-configurable host). Minor HTTP ergonomics noted by audit, fold into the same touch: unknown paths return 405 not 404; HTTP rejection replies flatten the errors array into the message; >1MB bodies get a connection reset instead of a 4xx.",
+      "files": ["memory/writer.mjs:88-96"],
+      "action": "Make bind host env-configurable (BENCHFIRST_WRITER_HOST) when building i4/i5 containers",
+      "update_2026_07_18": "Now on the critical path: Path B (F14) containerizes the WRITER for the Akash lease, so the 127.0.0.1 bind must become configurable in revised i5."
+    },
+    {
+      "id": "F13",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-17",
+      "task": "i3",
+      "title": "'Opinion can't reach S3' is convention until Pomerium + scoped credentials exist",
+      "detail": "In-process, any code that imports s3-store.mjs can still write directly, bypassing the writer (today only the writer and the demo's reset — known F8 — do). True enforcement arrives when i4 Pomerium fronts the HTTP writer with an identity policy AND i7 scopes S3 write credentials to the writer's identity only. The writer HTTP endpoint itself has no auth by design (auth is Pomerium's job).",
+      "files": ["memory/writer.mjs", "memory/s3-store.mjs", "scripts/demo.mjs:71"],
+      "action": "i4 + i7 close this; until then it's held by code review"
+    },
+    {
+      "id": "F14",
+      "severity": "FAILURE",
+      "status": "resolved",
+      "logged": "2026-07-18",
+      "resolved": "2026-07-18 by Path B pivot (Isha's decision)",
+      "task": "i6 preflight (run by Isha outside this session)",
+      "title": "Akash cannot host the benchmark — preflight CoV gate failed on every viable lease",
+      "detail": "Preflight harness (akash/preflight/, image ishamishra0408/akash-preflight:v2): local Mac CoV 0.029 PASS; Akash ZenCloud never booted; overclock-southwest 1CPU CoV 0.414 FAIL; overclock-west 4CPU CoV 0.178 FAIL — all far above the 0.08 gate. Resolution: Path B — benchmark runs on Isha's Mac (the proven 0.029 environment); Akash instead hosts the WRITER + Pomerium, so the trust story becomes 'write-path enforced on decentralized compute'. The three CoV numbers are pitch evidence: the foundation was tested before being built on.",
+      "files": ["akash/preflight/harness.mjs", "akash/preflight/Dockerfile", "akash/deploy.yaml"],
+      "action": "None — decision made and documented; revised i5/i7 execute Path B"
+    },
+    {
+      "id": "F15",
+      "severity": "WARNING",
+      "status": "open",
+      "logged": "2026-07-18",
+      "task": "Path B pivot",
+      "title": "The Mac's 0.029 CoV was measured IDLE — under load this same machine hit 0.348",
+      "detail": "Path B promotes the local Mac to official benchmark host on the strength of preflight CoV 0.029. But during this session's demo runs (builds, downloads, browsers running), baseline CoV on the same Mac reached 0.348 and minted a false verdict (F10). The 0.029 number is conditional on an idle machine. For the live i8 capture: close other apps, don't run builds mid-demo, and (per F10's recommendation) gate verdicts on measured CoV so a noisy run refuses rather than lies.",
+      "files": ["akash/preflight/harness.mjs", "optimizer/loop.mjs"],
+      "action": "Adopt an idle-machine checklist for demo runs + the F10 local CoV gate"
+    },
+    {
+      "id": "F16",
+      "severity": "FLAG",
+      "status": "decision-needed",
+      "logged": "2026-07-18",
+      "task": "Path B pivot",
+      "title": "docs/build-plan.html still describes Path A for i5/i6/i7",
+      "detail": "The shared plan's task text now contradicts reality: i5 says 'Containerize app + harness' (now: containerize the writer service), i6 says 'gate CoV on the Akash lease' (preflight done, verdict: Akash can't host the bench), i7 says deploy-with-CoV-requirement (now: deploy writer, no CoV requirement). The plan is a shared artifact with Devansh; not edited unilaterally.",
+      "files": ["docs/build-plan.html"],
+      "action": "Isha confirms, then update the plan text (and tell Devansh the trust-story framing changed for his d6 pitch script)"
+    },
+    {
+      "id": "R1",
+      "severity": "RESOLVED",
+      "status": "resolved",
+      "logged": "2026-07-17",
+      "task": "i0",
+      "title": "README documented runInteraction() -> { ms } but code returns { ms, settleModelMs }",
+      "detail": "One-line doc drift, fixed in README.md:70.",
+      "files": ["README.md:70"]
+    },
+    {
+      "id": "R2",
+      "severity": "RESOLVED",
+      "status": "resolved",
+      "logged": "2026-07-17",
+      "task": "i1",
+      "title": "Dual source of truth for candidate ordering (loop inline copy vs picker.mjs)",
+      "detail": "i1 wiring removed the inline block; loop.mjs now calls pickOrder(). Audit verdict SHIP; offline order proven identical.",
+      "files": ["optimizer/loop.mjs"]
+    },
+    {
+      "id": "R3",
+      "severity": "RESOLVED",
+      "status": "resolved",
+      "logged": "2026-07-17",
+      "task": "i1 audit",
+      "title": "Dead initializer skippedKnownLosers:[] in loop report",
+      "detail": "Immediately overwritten after the pickOrder call; removed.",
+      "files": ["optimizer/loop.mjs"]
+    }
+  ]
+}

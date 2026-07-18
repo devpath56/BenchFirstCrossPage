@@ -67,7 +67,7 @@ gated this before any build was allowed.
 - `npm run dev` — open the DMV app (`#page=a` Registration, `#page=b` Appointments). Trigger states via
   inputs: default → success · `NONE`/`00000` → empty · `FAIL`/`ERROR` → error.
 - **Agent / CLI / MCP hooks** (the stable interface): `window.__dmv` (`setInput` / `submit` / `getState`)
-  and `window.__benchfirst.runInteraction() → { ms }`.
+  and `window.__benchfirst.runInteraction() → { ms, settleModelMs }`.
 
 ## Layout
 ```
@@ -77,7 +77,8 @@ src/pages/pageB.jsx     Appointments  (data + renderStage only)
 bench/harness.mjs       Chromium + scripted replay → measured time-to-settled + CoV
 bench/signature.mjs     the problem-class key that makes cross-page transfer work
 optimizer/loop.mjs      retrieve → score → promote → refuse/writeback
-memory/store.mjs        durable JSON memory (the "scar file")
+memory/store.mjs        local JSON memory (the "scar file")
+memory/s3-store.mjs     scar file on S3 (BENCHFIRST_S3_BUCKET / _S3_KEY env; local fallback when unset)
 scripts/demo.mjs        the cold-vs-warm demo + deterministic acceptance checks
 ```
 

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { startServer, launch } from '../bench/harness.mjs';
 import { optimize } from '../optimizer/loop.mjs';
-import * as memory from '../memory/store.mjs';
+import * as memory from '../memory/s3-store.mjs';
 
 const dist = path.resolve('dist');
 
@@ -68,7 +68,7 @@ function verifyPromises(a, b) {
 
 async function main() {
   ensureBuild();
-  memory.reset(); // start every demo from an empty memory so "cold" is honest
+  await memory.reset(); // start every demo from an empty memory so "cold" is honest
   const server = await startServer(dist);
   const browser = await launch();
   try {

@@ -7,7 +7,9 @@
 //
 import { signature } from '../bench/signature.mjs';
 import { measure, readProfile } from '../bench/harness.mjs';
-import * as memory from '../memory/store.mjs';
+import { pickOrder } from './picker.mjs';
+import { submitVerdict } from '../memory/writer.mjs';
+import * as memory from '../memory/s3-store.mjs';
 
 const THRESHOLD = 20; // a candidate must cut render time by >=20% to count as a real win
 // The candidate fixes the optimizer can try (baseline = the request-waterfall we beat).
@@ -17,7 +19,7 @@ const ALL_FIXES = ['parallel', 'spinner'];
 export async function optimize({ browser, url, pageId, runs = 3 }) {
   const profile = await readProfile(browser, url, pageId);
   const sig = signature(profile);
-  const mem = memory.load();
+  const mem = await memory.load();
   const known = mem[sig];
 
   // 1. Baseline benchmark — the number every candidate must beat.
@@ -31,23 +33,14 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
     baselineCov: baseline.cov,
     candidates: [],
     benchRuns: baseline.n,
-    skippedKnownLosers: [],
+    memorySource: memory.source(),
   };
 
-  // 2. Decide candidate order. With memory: try the known winner first and skip
-  //    strategies memory already proved don't beat baseline (A: skip known losers).
-  let order;
-  if (known) {
-    const losers = new Set(
-      Object.entries(known.candidates)
-        .filter(([, v]) => !v.beat)
-        .map(([k]) => k)
-    );
-    report.skippedKnownLosers = [...losers];
-    order = [known.winner, ...ALL_FIXES.filter((s) => s !== known.winner && !losers.has(s))];
-  } else {
-    order = [...ALL_FIXES]; // cold: explore every candidate
-  }
+  // 2. Decide candidate order. The picker PROPOSES (Bedrock when configured, the
+  //    deterministic fallback otherwise); the benchmark below still DISPOSES.
+  const { order, skippedLosers, source } = await pickOrder({ signature: sig, allFixes: ALL_FIXES, known });
+  report.skippedKnownLosers = skippedLosers;
+  report.orderSource = source;
 
   // 3. Score candidates by measured delta.
   for (const strat of order) {
@@ -78,18 +71,22 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
   report.winner = winners[0].strategy;
   report.winnerDeltaPct = winners[0].deltaPct;
 
-  // 5. Write back to memory (merge new knowledge with any prior knowledge).
+  // 5. Write back — through the verdict WRITER, never directly to the store.
+  //    The writer re-validates against schema/verdict.json; an unmeasured
+  //    "opinion" would be rejected here before it could reach S3.
   const mergedCandidates = known ? { ...known.candidates } : {};
   for (const c of report.candidates) {
     mergedCandidates[c.strategy] = { deltaPct: c.deltaPct, beat: c.beat };
   }
-  mem[sig] = {
-    winner: report.winner,
-    candidates: mergedCandidates,
-    firstSeenPage: known?.firstSeenPage ?? pageId,
-    updatedByPage: pageId,
-  };
-  memory.save(mem);
+  await submitVerdict({
+    signature: sig,
+    record: {
+      winner: report.winner,
+      candidates: mergedCandidates,
+      firstSeenPage: known?.firstSeenPage ?? pageId,
+      updatedByPage: pageId,
+    },
+  });
 
   return report;
 }
