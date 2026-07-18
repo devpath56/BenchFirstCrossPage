@@ -138,15 +138,15 @@
     },
     {
       "id": "F12",
-      "severity": "WARNING",
-      "status": "open",
+      "severity": "RESOLVED",
+      "status": "resolved",
       "logged": "2026-07-17",
+      "resolved": "2026-07-18 by i4 (Step 2)",
       "task": "i3 audit",
       "title": "Writer binds hardcoded 127.0.0.1 — unreachable as a containerized Pomerium upstream",
-      "detail": "Correct for local runs; wrong for i4/i5 if Pomerium and the writer run in separate containers (upstream would need 0.0.0.0 or an env-configurable host). Minor HTTP ergonomics noted by audit, fold into the same touch: unknown paths return 405 not 404; HTTP rejection replies flatten the errors array into the message; >1MB bodies get a connection reset instead of a 4xx.",
-      "files": ["memory/writer.mjs:88-96"],
-      "action": "Make bind host env-configurable (BENCHFIRST_WRITER_HOST) when building i4/i5 containers",
-      "update_2026_07_18": "Now on the critical path: Path B (F14) containerizes the WRITER for the Akash lease, so the 127.0.0.1 bind must become configurable in revised i5."
+      "detail": "RESOLVED: startWriter now takes host from BENCHFIRST_WRITER_HOST (default 127.0.0.1 for local safety; containers set 0.0.0.0). Verified live: bound host echoed in the result and startup log. Still-open minor HTTP ergonomics (deferred, non-blocking, tracked here): unknown paths return 405 not 404; HTTP rejection replies flatten the errors array into the message; >1MB bodies get a connection reset instead of a 4xx — polish these when hardening for i5 if time permits.",
+      "files": ["memory/writer.mjs:71-99"],
+      "action": "Bind host done. Optional HTTP-ergonomics polish remains for i5 hardening."
     },
     {
       "id": "F13",
@@ -157,7 +157,8 @@
       "title": "'Opinion can't reach S3' is convention until Pomerium + scoped credentials exist",
       "detail": "In-process, any code that imports s3-store.mjs can still write directly, bypassing the writer (today only the writer and the demo's reset — known F8 — do). True enforcement arrives when i4 Pomerium fronts the HTTP writer with an identity policy AND i7 scopes S3 write credentials to the writer's identity only. The writer HTTP endpoint itself has no auth by design (auth is Pomerium's job).",
       "files": ["memory/writer.mjs", "memory/s3-store.mjs", "scripts/demo.mjs:71"],
-      "action": "i4 + i7 close this; until then it's held by code review"
+      "action": "i4 + i7 close this; until then it's held by code review",
+      "update_2026_07_18": "i4 done — the identity gate now exists on TWO layers: (1) pomerium/config.yaml allow-policy admits exactly one identity to POST /verdict; (2) writer.mjs backstop rejects (403) any request whose x-pomerium-claim-email != BENCHFIRST_VERDICT_IDENTITY. Gate ON iff the env var is DEFINED; a defined-but-empty value FAILS CLOSED (refuses all writes) rather than silently opening (audit-hardened). healthz returns only {ok:true} — no bucket/key leak. Verified live: unset->200 (demo unchanged), empty->403, missing/wrong->403, correct->200. REMAINING to fully close: (a) i5 network isolation so the writer is reachable ONLY via Pomerium (else the backstop header could be set directly), (b) i7 scoped S3 creds (only the writer identity holds s3:PutObject), (c) the in-process bypass — the demo's direct s3-store.reset() (F8) still writes without the writer. Trust model + i7 checklist (verify pass_identity_headers emits x-pomerium-claim-email on the pinned Pomerium version; envsubst the ${ENV} placeholders) in pomerium/README.md + config.yaml."
     },
     {
       "id": "F14",

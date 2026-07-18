@@ -1,0 +1,69 @@
+# pomerium/config.yaml — i4: the identity gate in front of the verdict writer.
+#
+# Trust model (target end-state): the verdict writer (memory/writer.mjs) is the
+# intended sole write path to the scar file, and Pomerium fronts it so only the
+# verdict-runner identity can reach POST /verdict. This is only FULLY enforced
+# once (a) i5 network-isolates the writer so Pomerium is its ONLY ingress and
+# (b) i7 scopes S3 creds so only the writer identity holds s3:PutObject. Until
+# then it is defence-in-depth over a convention (in-process callers can still
+# write directly — see FLAGS F8/F13). i4 locks the STRUCTURE: route, upstream,
+# allow policy, and the writer-side identity backstop.
+#
+# NOTE for i7: ${ENV} tokens below are TEXT-SUBSTITUTION placeholders — Pomerium
+# does NOT shell-expand route from/to/policy fields at load, so envsubst (or a
+# templating step) must replace them before deploy; exporting vars is not enough.
+
+# ── Service URLs (i7 sets real DNS; these are the shape) ─────────────────────
+# All-in-one Pomerium: authenticate + proxy in one process on the Akash lease.
+authenticate_service_url: https://authenticate.${BENCHFIRST_DOMAIN}
+
+# Cookie + data-plane secrets. Generate with `head -c32 /dev/urandom | base64`.
+# Provide via env/secret at deploy time — never commit real values.
+cookie_secret: ${POMERIUM_COOKIE_SECRET}
+shared_secret: ${POMERIUM_SHARED_SECRET}
+
+# JWT Pomerium mints and injects upstream so the writer can verify the caller
+# identity (memory/writer.mjs reads x-pomerium-claim-email). i7 generates:
+#   openssl ecparam -genkey -name prime256v1 -noout -out ec_private.pem
+signing_key_file: /pomerium/signing-key.pem
+
+# ── Identity provider ────────────────────────────────────────────────────────
+# The verdict-runner authenticates here. For a machine caller, a service account
+# from the same IdP is cleanest (a single, non-human identity that owns writes).
+# Swap for the IdP you stand up in i7 (Google, GitHub, Okta, Auth0, …).
+idp_provider: ${BENCHFIRST_IDP_PROVIDER}          # e.g. "google" / "oidc"
+idp_client_id: ${BENCHFIRST_IDP_CLIENT_ID}
+idp_client_secret: ${BENCHFIRST_IDP_CLIENT_SECRET}
+# idp_provider_url: ${BENCHFIRST_IDP_URL}         # for generic "oidc"
+
+# ── Routes ───────────────────────────────────────────────────────────────────
+routes:
+  # The verdict write path. Only the verdict-runner identity may reach it, and
+  # Pomerium injects verified identity headers the writer re-checks (F13 backstop).
+  - from: https://verdict.${BENCHFIRST_DOMAIN}
+    to: http://writer:8787            # internal upstream (i5 container/service name)
+    name: verdict-writer
+    # Injects the verified identity upstream. i7: confirm the pinned Pomerium
+    # version emits x-pomerium-claim-email (the header writer.mjs reads); newer
+    # versions may require `jwt_claims_headers: [email]` instead — verify against
+    # an echo upstream before trusting the gated path.
+    pass_identity_headers: true
+    # Method-level restriction (POST /verdict) stays the writer's job: it already
+    # 405s anything else. Path prefixes here scope which routes exist at all.
+    prefix: /verdict
+    policy:
+      - allow:
+          and:
+            # THE gate: exactly one identity may write verdicts. Replace with the
+            # service-account email you provision in i7.
+            - email:
+                is: ${BENCHFIRST_VERDICT_IDENTITY}   # e.g. verdict-runner@benchfirst.iam.example.com
+
+  # Public, unauthenticated health check for the Akash provider / uptime probes.
+  # Liveness only — the writer returns {ok:true} and deliberately does NOT reveal
+  # the store location (bucket/key would be recon before i7's scoped creds).
+  - from: https://verdict.${BENCHFIRST_DOMAIN}
+    to: http://writer:8787
+    name: verdict-writer-health
+    prefix: /healthz
+    allow_public_unauthenticated_access: true

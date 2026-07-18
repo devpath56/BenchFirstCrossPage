@@ -68,14 +68,44 @@ export async function submitVerdict(verdict) {
   return body;
 }
 
-export function startWriter({ port = Number(process.env.BENCHFIRST_WRITER_PORT) || 8787 } = {}) {
+// Defense-in-depth (belt to Pomerium's suspenders). When BENCHFIRST_VERDICT_IDENTITY
+// is set, the writer requires Pomerium's verified identity header to match it — so
+// even a request that reaches the upstream must carry the verdict-runner identity
+// that Pomerium asserts (and overwrites). Unset (local/offline) = no assertion.
+// Pomerium strips client-supplied copies of X-Pomerium-* before proxying, so this
+// header is trustworthy only for traffic that actually transits Pomerium; pair it
+// with network isolation (writer not publicly reachable) — see pomerium/README.md.
+// Gate ON iff the env var is DEFINED. Unset = off (local/offline). A defined but
+// EMPTY value is a misconfig, not "off" — we fail CLOSED (an empty required
+// identity matches no caller, so every request is rejected), never silently open.
+const gateOn = () => process.env.BENCHFIRST_VERDICT_IDENTITY !== undefined;
+const REQUIRED_IDENTITY = () => process.env.BENCHFIRST_VERDICT_IDENTITY;
+const IDENTITY_HEADER = (process.env.BENCHFIRST_IDENTITY_HEADER || 'x-pomerium-claim-email').toLowerCase();
+
+function identityError(req) {
+  if (!gateOn()) return null; // enforcement off (env var unset)
+  const want = REQUIRED_IDENTITY();
+  const got = req.headers[IDENTITY_HEADER];
+  if (!want) return 'verdict-runner identity is misconfigured (empty) — refusing all writes';
+  if (got !== want) return `caller identity "${got ?? '(none)'}" is not the verdict-runner`;
+  return null;
+}
+
+export function startWriter({
+  port = Number(process.env.BENCHFIRST_WRITER_PORT) || 8787,
+  host = process.env.BENCHFIRST_WRITER_HOST || '127.0.0.1', // containers set 0.0.0.0 for Pomerium
+} = {}) {
   const server = http.createServer((req, res) => {
     const send = (code, obj) => {
       res.writeHead(code, { 'content-type': 'application/json' });
       res.end(JSON.stringify(obj) + '\n');
     };
-    if (req.method === 'GET' && req.url === '/healthz') return send(200, { ok: true, store: memory.source() });
+    // Public, unauthenticated liveness only — must NOT leak the store location
+    // (bucket/key would be recon before i7's scoped creds land).
+    if (req.method === 'GET' && req.url === '/healthz') return send(200, { ok: true });
     if (req.method !== 'POST' || req.url !== '/verdict') return send(405, { error: 'POST /verdict only' });
+    const idErr = identityError(req);
+    if (idErr) return send(403, { error: idErr }); // Pomerium should have blocked it; this is the backstop
     let body = '';
     req.on('data', (c) => {
       body += c;
@@ -92,14 +122,15 @@ export function startWriter({ port = Number(process.env.BENCHFIRST_WRITER_PORT) 
     });
   });
   return new Promise((resolve) =>
-    server.listen(port, '127.0.0.1', () =>
-      resolve({ port: server.address().port, close: () => new Promise((r) => server.close(r)) })
+    server.listen(port, host, () =>
+      resolve({ host, port: server.address().port, close: () => new Promise((r) => server.close(r)) })
     )
   );
 }
 
 // CLI: `npm run writer` — run the writer service (Pomerium upstream for i4).
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { port } = await startWriter({});
-  console.log(`verdict writer listening on 127.0.0.1:${port} → ${memory.source()}`);
+  const { host, port } = await startWriter({});
+  const gate = gateOn() ? `identity-gated (${REQUIRED_IDENTITY() || 'MISCONFIGURED-empty → all writes refused'})` : 'ungated (local)';
+  console.log(`verdict writer listening on ${host}:${port} → ${memory.source()} · ${gate}`);
 }
