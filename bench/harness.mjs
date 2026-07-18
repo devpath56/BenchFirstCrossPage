@@ -111,6 +111,15 @@ export async function measureOverhead(browser, url, pageId, runs = 3) {
   return vals[Math.floor(vals.length / 2)]; // median
 }
 
+// Flow-correctness: run the variant to settle, then ask the page whether the flow still worked
+// ("nothing else broke"). Returns { ok, checks:[{name,pass,detail}] }.
+export async function checkCorrectness(browser, url, pageId, variant) {
+  return withPage(browser, url, pageId, variant, async (page) => {
+    await page.evaluate(() => window.__benchfirst.runInteraction());
+    return page.evaluate(() => window.__benchfirst.correctness());
+  });
+}
+
 // CLI: `node bench/harness.mjs --page a --variant memo`
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = Object.fromEntries(

@@ -6,11 +6,12 @@
 //     ->  refuse "done" until best beats baseline  ->  write result back to memory
 //
 import { signature } from '../bench/signature.mjs';
-import { measure, measureOverhead, readProfile } from '../bench/harness.mjs';
+import { measure, measureOverhead, readProfile, checkCorrectness } from '../bench/harness.mjs';
 import * as memory from '../memory/store.mjs';
 
 const THRESHOLD = 20; // a candidate must cut time-to-settled by >=20% to count as a real win
 const COV_GATE = 0.08; // benchmark is untrusted above this coefficient of variation
+const CONF_MIN = 0.5; // confidence floor: below it, hold for a human (D8)
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // The candidate fixes the optimizer can try (baseline = the request-waterfall we beat).
 // `spinner` is a cosmetic non-fix that does NOT cut load time — memory learns to skip it.
@@ -101,6 +102,11 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
   const covTrust = clamp01(1 - baseline.cov / COV_GATE);
   const marginTrust = clamp01((report.winnerDeltaPct - THRESHOLD) / THRESHOLD);
   report.confidence = +(covTrust * marginTrust).toFixed(2);
+
+  // Flow-correctness of the winner — "nothing else broke" (the fired-metric guard). A faster
+  // candidate that breaks the flow must NOT ship on speed alone.
+  report.correctness = await checkCorrectness(browser, url, pageId, report.winner);
+  report.recommendation = report.correctness.ok && report.confidence >= CONF_MIN ? 'SHIP' : 'REVIEW';
 
   // 5. Write back to memory (merge new knowledge with any prior knowledge).
   const mergedCandidates = known ? { ...known.candidates } : {};

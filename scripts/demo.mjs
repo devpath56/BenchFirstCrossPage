@@ -28,8 +28,13 @@ function printReport(r) {
       `    candidate ${c.strategy.padEnd(9)} ${String(c.ms).padStart(7)}ms  Δ ${String(c.deltaPct).padStart(5)}%  ${mark}`
     );
   }
-  if (r.done) console.log(`  → winner: ${r.winner}  (−${r.winnerDeltaPct}% time-to-settled, confidence ${r.confidence})  · tested ${r.candidates.length} candidate(s), ${r.benchRuns} bench runs`);
-  else console.log(`  → ${r.refusal}`);
+  if (r.done) {
+    console.log(`  → winner: ${r.winner}  (−${r.winnerDeltaPct}% time-to-settled, confidence ${r.confidence})  · tested ${r.candidates.length} candidate(s), ${r.benchRuns} bench runs`);
+    if (r.correctness) {
+      const broke = r.correctness.checks.filter((c) => !c.pass).map((c) => c.name).join('; ');
+      console.log(`  correctness: ${r.correctness.ok ? '✓ nothing else broke' : '✗ ' + broke}  · recommendation: ${r.recommendation}`);
+    }
+  } else console.log(`  → ${r.refusal}`);
 }
 
 function printContrast(a, b) {
