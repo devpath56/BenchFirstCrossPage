@@ -13,7 +13,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 export const money = (n) => '$' + Number(n).toFixed(2);
-const SPEED_BENCH = 40; // benchmark replays the real staggered load, time-compressed
+const SPEED_BENCH = 10; // benchmark replays the real staggered load, time-compressed
 
 // The candidate fixes the optimizer can try for a waterfall-load page.
 export const VARIANTS = ['baseline', 'parallel', 'spinner'];

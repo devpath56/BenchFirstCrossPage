@@ -37,11 +37,12 @@ function printContrast(a, b) {
   console.log('  COLD vs WARM  (what the memory layer bought us)');
   console.log('='.repeat(64));
   const row = (label, x, y) => console.log(`  ${label.padEnd(26)} ${String(x).padStart(14)} ${String(y).padStart(16)}`);
+  const cut = (r) => (r.done ? `−${r.winnerDeltaPct}%` : r.untrusted ? 'untrusted' : 'no win');
   row('', 'Page A (cold)', 'Page B (warm)');
   row('candidates tested', a.candidates.length, b.candidates.length);
   row('benchmark runs', a.benchRuns, b.benchRuns);
   row('winner', a.winner, b.winner);
-  row('time-to-settled cut', `−${a.winnerDeltaPct}%`, `−${b.winnerDeltaPct}%`);
+  row('time-to-settled cut', cut(a), cut(b));
   row('warm-started from memory', 'no', b.warmStarted ? `yes (from ${b.candidates.length ? 'Page A' : '—'})` : 'no');
 }
 

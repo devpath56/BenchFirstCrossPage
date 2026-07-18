@@ -11,7 +11,12 @@ import { pickOrder } from './picker.mjs';
 import { submitVerdict } from '../memory/writer.mjs';
 import * as memory from '../memory/s3-store.mjs';
 
-const THRESHOLD = 20; // a candidate must cut render time by >=20% to count as a real win
+const THRESHOLD = 60; // d4 ship number: a candidate must cut time-to-settled by >=60% to count as a real win
+// Determinism gate (same bar as the Akash preflight). A measurement whose
+// coefficient of variation exceeds this is too noisy to trust — a jittery run
+// can mint a fake "win" (see FLAGS F10/F15), so the loop REFUSES rather than
+// writes an unearned verdict. Trust story: the scale must be steady before we read it.
+const MAX_COV = 0.08;
 // The candidate fixes the optimizer can try (baseline = the request-waterfall we beat).
 // `spinner` is a cosmetic non-fix that does NOT cut load time — memory learns to skip it.
 const ALL_FIXES = ['parallel', 'spinner'];
@@ -32,9 +37,22 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
     baselineMs: +baseline.mean.toFixed(1),
     baselineCov: baseline.cov,
     candidates: [],
+    skippedKnownLosers: [],
     benchRuns: baseline.n,
     memorySource: memory.source(),
   };
+
+  // 1a. Determinism gate on the anchor. If the baseline itself is noisy, every
+  //     delta measured against it is untrustworthy — refuse before we can lie.
+  if (baseline.cov > MAX_COV) {
+    report.done = false;
+    report.winner = null;
+    report.untrusted = true;
+    report.refusal =
+      `Baseline CoV ${baseline.cov} exceeds ${MAX_COV} — measurement too noisy to trust. ` +
+      `Refusing to declare a winner (would risk a false verdict).`;
+    return report;
+  }
 
   // 2. Decide candidate order. The picker PROPOSES (Bedrock when configured, the
   //    deterministic fallback otherwise); the benchmark below still DISPOSES.
@@ -47,12 +65,17 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
     const m = await measure(browser, url, pageId, strat, runs);
     report.benchRuns += m.n;
     const deltaPct = ((baseline.mean - m.mean) / baseline.mean) * 100;
-    const beat = deltaPct >= THRESHOLD;
+    // A win must clear the threshold AND come from a steady measurement — a
+    // noisy candidate run can't be promoted (guards against a jitter-born delta).
+    const trusted = m.cov <= MAX_COV;
+    const beat = trusted && deltaPct >= THRESHOLD;
     report.candidates.push({
       strategy: strat,
       ms: +m.mean.toFixed(1),
       deltaPct: +deltaPct.toFixed(1),
+      cov: m.cov,
       beat,
+      ...(trusted ? {} : { untrusted: true }),
     });
     // Warm-start early stop: if memory pointed us at a winner and it beats, we're
     // done — no need to explore the rest. This is the cross-page speed-up (B).

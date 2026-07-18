@@ -9,19 +9,21 @@
   "entries": [
     {
       "id": "F1",
-      "severity": "FAILURE",
-      "status": "decision-needed",
+      "severity": "RESOLVED",
+      "status": "resolved",
       "logged": "2026-07-17",
+      "resolved": "2026-07-18 by Step 1 — Isha set SPEED_BENCH=10 + THRESHOLD=60",
       "task": "i1 (discovered during), pre-existing on clean HEAD",
       "title": "Offline demo fails its own acceptance checks (Page B parallel misses the 20% bar)",
       "detail": "npm run demo reproducibly fails 2/6 checks: Page B's parallel fix measures only ~13-16% time-to-settled cut vs the 20% THRESHOLD (CoV ~1%, systematic). Verified pre-existing: clean HEAD (git stash) fails identically. Mechanism (audit-verified): SPEED_BENCH=40 compresses Page B's parallel settle model to 52.5ms, but ~75ms of fixed render/timer overhead per run (4x CPU throttle) swamps it; the 145ms baseline absorbs the overhead, so only parallel inflates and the delta collapses from a modeled 64% to ~15%. Page A survives because its parallel long-pole is 900ms vs Page B's 1900ms map.",
       "files": ["src/pages/dmvlist.jsx:16", "src/pages/pageB.jsx:24", "optimizer/loop.mjs:13", "scripts/demo.mjs:50-67"],
       "options": [
-        "Lower SPEED_BENCH from 40 to ~10 (recommended: fixes the physics; demo runs ~4x longer)",
+        "Lower SPEED_BENCH from 40 to 10 (recommended: fixes the physics; demo runs ~4x longer)",
         "Shrink Page B's map dur (changes the substrate story)",
         "Lower THRESHOLD below 20% (moves the goalposts; touches Devansh's d4 ship number)"
       ],
-      "action": "Isha + Devansh decide calibration (ties to d4 'confirm the number'), then re-verify 6/6 PASS"
+      "action": "Isha + Devansh decide calibration (ties to d4 'confirm the number'), then re-verify 6/6 PASS",
+      "update_2026_07_18": "RESOLVED. Isha approved: SPEED_BENCH=10 (dmvlist.jsx:16) and THRESHOLD raised 20->60 (loop.mjs:14) to match Devansh's d4 ship number (>=60% time-to-settled cut). Verified 3x back-to-back: 6/6 PASS every run. Page A parallel 75.0-76.7%, Page B parallel 63.2-63.4% (stable ~3pp margin over the 60% bar, NOT flaky), spinner -0.6% to +0.6% (correctly rejected). Baseline CoVs tight. NOTE for i8/monitoring: Page B's margin over 60% is only ~3pp — if the substrate or environment changes, re-verify Page B still clears 60%; the CoV gate protects against noise but not against a genuine margin shift."
     },
     {
       "id": "F2",
@@ -113,19 +115,15 @@
     },
     {
       "id": "F10",
-      "severity": "FAILURE",
-      "status": "decision-needed",
+      "severity": "RESOLVED",
+      "status": "resolved",
       "logged": "2026-07-17",
+      "resolved": "2026-07-18 by Step 1 (CoV gate), Isha-approved",
       "task": "i3 (observed during demo verification)",
       "title": "Noisy local benchmark can mint FALSE verdicts — observed live",
-      "detail": "During an i3 demo run, Page A's baseline came in at 193ms with CoV 0.3481 (heavy machine noise, an outlier-inflated baseline). Against that inflated baseline, the cosmetic 'spinner' non-fix measured a 25.3% 'win' and was written to memory as beat=true — a schema-valid, semantically-valid verdict born entirely of noise. The writer cannot catch this: it validates shape and winner-beat consistency, not measurement quality. The loop has NO CoV gate; i6's preflight (CoV<=0.08) only guards the Akash lease, not local runs.",
-      "files": ["optimizer/loop.mjs:24-31", "bench/harness.mjs:78-93", "scripts/demo.mjs"],
-      "options": [
-        "Gate locally too: loop refuses to trust/write a verdict when baseline CoV > 0.08 (recommended; matches the d4 ship number and makes the trust story uniform)",
-        "Leave local ungated; treat local demo as illustrative only and rely on i6's Akash gate for real verdicts"
-      ],
-      "action": "Isha decides local CoV gating (ties to d4 and i6); note evidence lives in this entry",
-      "update_2026_07_18": "Path B pivot (see F14) makes this URGENT: the local Mac is now the OFFICIAL benchmark host, so an ungated local bench is the trust story's weakest link. The 0.029 preflight CoV was measured idle; this entry's 0.348 was the same Mac under load. Recommend: loop refuses verdicts when baseline CoV > 0.08, matching the preflight gate."
+      "detail": "Was: a noise-inflated baseline (CoV 0.348) let the cosmetic 'spinner' non-fix measure a fake 25.3% 'win' and reach memory. RESOLVED: optimizer/loop.mjs now has a determinism gate (MAX_COV=0.08, same bar as the Akash preflight). If the BASELINE CoV exceeds it the loop refuses early (report.untrusted=true, no verdict written); each CANDIDATE run is also guarded so a jittery candidate can't be promoted (beat=false + untrusted flag). Proven live during Step 1: a 0.265-CoV Page A run correctly REFUSED instead of writing — the same run that previously would have lied. Also fixed a crash the early-refuse path exposed (report.skippedKnownLosers now initialized on every path). See F15 for the machine-idle discipline that keeps CoV under the gate.",
+      "files": ["optimizer/loop.mjs:14-19 (MAX_COV)", "optimizer/loop.mjs:45-55 (baseline gate)", "optimizer/loop.mjs:68-71 (candidate guard)"],
+      "action": "Done. Pairs with F15 (keep the machine idle so honest runs don't trip the gate)."
     },
     {
       "id": "F11",
@@ -182,7 +180,8 @@
       "title": "The Mac's 0.029 CoV was measured IDLE — under load this same machine hit 0.348",
       "detail": "Path B promotes the local Mac to official benchmark host on the strength of preflight CoV 0.029. But during this session's demo runs (builds, downloads, browsers running), baseline CoV on the same Mac reached 0.348 and minted a false verdict (F10). The 0.029 number is conditional on an idle machine. For the live i8 capture: close other apps, don't run builds mid-demo, and (per F10's recommendation) gate verdicts on measured CoV so a noisy run refuses rather than lies.",
       "files": ["akash/preflight/harness.mjs", "optimizer/loop.mjs"],
-      "action": "Adopt an idle-machine checklist for demo runs + the F10 local CoV gate"
+      "action": "Adopt an idle-machine checklist for demo runs + the F10 local CoV gate",
+      "update_2026_07_18": "F10 gate now SHIPPED (a noisy run refuses instead of lying), so the downside is a false NEGATIVE (honest run trips the gate), not a false verdict. Confirmed live in Step 1: Page A baseline CoV swung 0.265 (loaded, refused) -> 0.002 (idle, passed) across back-to-back runs with load avg ~4 on a 10-core Mac, Docker Desktop up. Observed sub-pattern: Page A baseline is STRUCTURALLY noisier than Page B (Page A CoV 0.24-0.35 vs Page B 0.005-0.017 across the session) — likely Page A's 7 per-fee re-renders + 'Amount Due' bump animation (key={running}) vs Page B's 5 cards. For the demo: quit Docker Desktop + heavy apps first; if a run refuses, just re-run. Consider (with Devansh) smoothing Page A's per-fee re-render if it keeps tripping."
     },
     {
       "id": "F16",
