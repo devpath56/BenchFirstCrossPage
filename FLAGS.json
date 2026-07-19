@@ -186,14 +186,15 @@
     },
     {
       "id": "F16",
-      "severity": "FLAG",
-      "status": "decision-needed",
+      "severity": "RESOLVED",
+      "status": "resolved",
       "logged": "2026-07-18",
+      "resolved": "2026-07-19 — Devansh confirmed the Path B updates; plan text updated",
       "task": "Path B pivot",
       "title": "docs/build-plan.html still describes Path A for i5/i6/i7",
-      "detail": "The shared plan's task text now contradicts reality: i5 says 'Containerize app + harness' (now: containerize the writer service), i6 says 'gate CoV on the Akash lease' (preflight done, verdict: Akash can't host the bench), i7 says deploy-with-CoV-requirement (now: deploy writer, no CoV requirement). The plan is a shared artifact with Devansh; not edited unilaterally.",
-      "files": ["docs/build-plan.html"],
-      "action": "Isha confirms, then update the plan text (and tell Devansh the trust-story framing changed for his d6 pitch script)"
+      "detail": "RESOLVED: Isha synced Devansh on the Path B updates and he confirmed. build-plan.html updated — i0-i6 marked done; i5 now 'containerize the WRITER (not harness), writer exposed only to Pomerium'; i6 now 'preflight proved Akash can't hold CoV<=0.08, bench runs local'; i7 now 'deploy writer+Pomerium, no CoV requirement, go-live kit ready'. Devansh's d6 pitch framing (Pomerium verdict-only write) already Path-B-compatible, no change needed.",
+      "files": ["docs/build-plan.html:224-239"],
+      "action": "Done."
     },
     {
       "id": "F17",
@@ -216,6 +217,17 @@
       "detail": "akash/writer/Dockerfile pins FROM --platform=linux/amd64 (Docker lint warns; deliberate — Akash providers are x86_64, matches the preflight image). Built + ran on the Apple-Silicon Mac via emulation (317MB image, boots fine). Unverified until i7/deploy: (a) the image running natively on an amd64 Akash provider; (b) the Akash SDL's service-to-service expose (`writer` exposed only `to: [service: pomerium]`) actually isolates the writer from global ingress on the chosen provider; (c) resource profile (0.5 cpu / 256Mi writer, 0.5 / 512Mi pomerium) is enough for Pomerium. Push the image (i7) before deploy — the SDL references ishamishra0408/benchfirst-writer:v1 which is not yet published.",
       "files": ["akash/writer/Dockerfile", "akash/deploy.yaml"],
       "action": "i7: docker push the writer image; verify service-to-service isolation + Pomerium resources on the live lease"
+    },
+    {
+      "id": "F19",
+      "severity": "FLAG",
+      "status": "decision-needed",
+      "logged": "2026-07-19",
+      "task": "i7 (Step 4)",
+      "title": "i7 live provisioning is blocked on credentials — kit is ready, execution is yours",
+      "detail": "This session has NO AWS creds, no aws/Akash CLI, no docker login — the live half of i7 (S3 bucket, Bedrock access, image push, Pomerium/IdP, Akash lease) can only be done by Isha on the consoles. What Step 4 delivered instead, all offline-verified: (1) build-plan updated to Path B (F16); (2) .env.example — full env contract; (3) .gitignore hardened so .env/.env.*/*.pem can't be committed; (4) scripts/verify-live.mjs (npm run verify-live) — a preflight that turns F6/F9/F17/F18 into one runnable check, each leg SKIPs when its env is unset (proven: offline = all SKIP exit 0; against a local gated writer = Writer-gate PASS); (5) docs/GO-LIVE.md — the ordered, credential-gated runbook. Nothing live has been executed or verified end-to-end yet.",
+      "files": ["docs/GO-LIVE.md", "scripts/verify-live.mjs", ".env.example"],
+      "action": "Isha: install aws + provider-services CLIs, then walk docs/GO-LIVE.md stage by stage, running `npm run verify-live` after each. This closes F6, F9, F17, F18."
     },
     {
       "id": "R1",

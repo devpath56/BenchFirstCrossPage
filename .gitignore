@@ -2,3 +2,10 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Secrets — real go-live creds live here; never commit (see .env.example)
+.env
+.env.*
+!.env.example
+pomerium/signing-key.pem
+*.pem

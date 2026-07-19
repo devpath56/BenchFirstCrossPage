@@ -8,7 +8,8 @@
     "dev": "vite",
     "bench": "node bench/harness.mjs",
     "writer": "node memory/writer.mjs",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "verify-live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1090.0",
