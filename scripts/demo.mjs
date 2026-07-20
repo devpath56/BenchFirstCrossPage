@@ -20,7 +20,7 @@ function ensureBuild() {
 function printReport(r) {
   const tag = r.warmStarted ? 'WARM (memory hit)' : 'COLD (empty memory)';
   console.log(`\n  Page ${r.pageId.toUpperCase()}  ·  signature="${r.signature}"  ·  ${tag}`);
-  console.log(`  baseline: ${r.baselineMs}ms time-to-settled  (CoV ${r.baselineCov})`);
+  console.log(`  baseline: ${r.baselineMs}ms time-to-settled  (app-adjusted ${r.baselineAdjMs}ms · overhead ${r.overheadMs}ms · CoV ${r.baselineCov})`);
   if (r.skippedKnownLosers.length) console.log(`  skipped known losers: ${r.skippedKnownLosers.join(', ')}`);
   for (const c of r.candidates) {
     const mark = c.beat ? '✓ beats' : '✗ misses';
@@ -28,8 +28,13 @@ function printReport(r) {
       `    candidate ${c.strategy.padEnd(9)} ${String(c.ms).padStart(7)}ms  Δ ${String(c.deltaPct).padStart(5)}%  ${mark}`
     );
   }
-  if (r.done) console.log(`  → winner: ${r.winner}  (−${r.winnerDeltaPct}% time-to-settled)  · tested ${r.candidates.length} candidate(s), ${r.benchRuns} bench runs`);
-  else console.log(`  → ${r.refusal}`);
+  if (r.done) {
+    console.log(`  → winner: ${r.winner}  (−${r.winnerDeltaPct}% time-to-settled, confidence ${r.confidence})  · tested ${r.candidates.length} candidate(s), ${r.benchRuns} bench runs`);
+    if (r.correctness) {
+      const broke = r.correctness.checks.filter((c) => !c.pass).map((c) => c.name).join('; ');
+      console.log(`  correctness: ${r.correctness.ok ? '✓ nothing else broke' : '✗ ' + broke}  · recommendation: ${r.recommendation}`);
+    }
+  } else console.log(`  → ${r.refusal}`);
 }
 
 function printContrast(a, b) {
@@ -67,6 +72,23 @@ function verifyPromises(a, b) {
   return ok;
 }
 
+// The v1 ship bar (spec/acceptance.md) — "done = behavior, not a screenshot".
+// A higher bar than the regression checks; informational (the 6/6 checks own the exit code).
+function printShip(a, b, ok) {
+  const CONF_MIN = 0.5, CUT_FLOOR = 60; // honest again: ruler calibrated + capped at the structural limit
+  const clauses = [
+    ['warm tests ≥50% fewer candidates', b.candidates.length <= a.candidates.length / 2],
+    [`time-to-settled cut ≥${CUT_FLOOR}%`, Math.min(a.winnerDeltaPct, b.winnerDeltaPct) >= CUT_FLOOR],
+    [`shipped verdict confidence ≥${CONF_MIN}`, (b.confidence || 0) >= CONF_MIN],
+    ['6/6 acceptance checks', ok === true],
+  ];
+  console.log('\n  Ship bar (v1 = measured behavior):');
+  let ship = true;
+  for (const [label, pass] of clauses) { console.log(`    ${pass ? '✓' : '✗'}  ${label}`); ship = ship && pass; }
+  console.log(`\n  SHIP: ${ship ? 'YES ✅' : 'HOLD — not v1-ready'}`);
+  return ship;
+}
+
 async function main() {
   ensureBuild();
   await memory.reset(); // start every demo from an empty memory so "cold" is honest
@@ -79,6 +101,7 @@ async function main() {
     printReport(b);
     printContrast(a, b);
     const ok = verifyPromises(a, b);
+    printShip(a, b, ok);
     process.exitCode = ok ? 0 : 1;
   } finally {
     await browser.close();

@@ -75,21 +75,49 @@ function stats(xs) {
 
 // Measure one (page, variant): 1 discarded warm-up + `runs` measured runs,
 // fresh browser context each time. Returns mean render-ms, CoV, row-render count.
-export async function measure(browser, url, pageId, variant, runs = 3) {
+export async function measure(browser, url, pageId, variant, runs = 5) {
   const vals = [];
+  let settleModelMs = 0;
   for (let i = 0; i < runs + 1; i++) {
     const m = await withPage(browser, url, pageId, variant, (page) =>
       page.evaluate(() => window.__runInteraction())
     );
-    if (i > 0) vals.push(m.ms); // i===0 is a discarded warm-up
+    if (i > 0) { vals.push(m.ms); settleModelMs = m.settleModelMs; } // i===0 is a discarded warm-up
   }
-  const s = stats(vals);
+  // Trimmed mean: drop the single highest & lowest run to kill jitter (#3), then average.
+  const sorted = [...vals].sort((a, b) => a - b);
+  const kept = sorted.length >= 4 ? sorted.slice(1, -1) : sorted;
+  const s = stats(kept);
   return {
     mean: s.mean,
     cov: +s.cov.toFixed(4),
-    n: vals.length,
-    runs: vals.map((v) => +v.toFixed(1)),
+    n: kept.length,
+    settleModelMs, // the variant's structural settle time — the physical cut ceiling
+    runs: kept.map((v) => +v.toFixed(1)),
   };
+}
+
+// Ruler calibration (#1): the harness's own fixed overhead, measured as a zero-model-time run.
+// Subtracting it from measured times removes instrument bias so the cut reflects the APP, not the rig.
+export async function measureOverhead(browser, url, pageId, runs = 3) {
+  const vals = [];
+  for (let i = 0; i < runs; i++) {
+    const o = await withPage(browser, url, pageId, 'baseline', (page) =>
+      page.evaluate(() => window.__benchfirst.overhead())
+    );
+    vals.push(o);
+  }
+  vals.sort((a, b) => a - b);
+  return vals[Math.floor(vals.length / 2)]; // median
+}
+
+// Flow-correctness: run the variant to settle, then ask the page whether the flow still worked
+// ("nothing else broke"). Returns { ok, checks:[{name,pass,detail}] }.
+export async function checkCorrectness(browser, url, pageId, variant) {
+  return withPage(browser, url, pageId, variant, async (page) => {
+    await page.evaluate(() => window.__benchfirst.runInteraction());
+    return page.evaluate(() => window.__benchfirst.correctness());
+  });
 }
 
 // CLI: `node bench/harness.mjs --page a --variant memo`

@@ -16,7 +16,9 @@ export const money = (n) => '$' + Number(n).toFixed(2);
 const SPEED_BENCH = 10; // benchmark replays the real staggered load, time-compressed
 
 // The candidate fixes the optimizer can try for a waterfall-load page.
-export const VARIANTS = ['baseline', 'parallel', 'spinner'];
+// `lossy` = a fault-injection variant: fast (parallel timing) but DROPS 2 components,
+// so the flow silently breaks (e.g. Amount Due wrong). The correctness check must catch it.
+export const VARIANTS = ['baseline', 'parallel', 'spinner', 'lossy'];
 
 // Given components [{id,dur}] and a variant, return each slot's resolve time + settle.
 export function schedule(components, variant) {
@@ -52,6 +54,11 @@ export function DmvService({ config, variant = 'baseline' }) {
   const runRef = useRef(() => {});
   const phaseRef = useRef('idle');
   phaseRef.current = phase; // latest phase for the stable getState() closure
+  const calibrateRef = useRef(false); // when true, run the same path with ZERO model time (ruler calibration)
+  const resolvedRef = useRef(new Set()); // latest rendered components — for the correctness check
+  const runningRef = useRef(0);
+  resolvedRef.current = resolved;
+  runningRef.current = running;
 
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
   const push = (t) => timers.current.push(t);
@@ -67,8 +74,13 @@ export function DmvService({ config, variant = 'baseline' }) {
     const done = new Promise((res) => { settleResolver.current = res; });
 
     if (outcome === 'success') {
-      const sch = schedule(config.components, variant);
-      config.components.forEach((c) => {
+      // Calibration run: same React + timer path, but zero model time, so elapsed ≈ pure harness overhead.
+      let comps = calibrateRef.current
+        ? config.components.map((c) => ({ id: c.id, dur: 0, fee: c.fee }))
+        : config.components;
+      if (variant === 'lossy') comps = comps.slice(0, -2); // drop 2 components → fast but INCOMPLETE
+      const sch = schedule(comps, variant === 'lossy' ? 'parallel' : variant);
+      comps.forEach((c) => {
         push(setTimeout(() => {
           setResolved((prev) => new Set(prev).add(c.id));
           if (c.fee) setRunning((r) => r + c.fee);
@@ -113,7 +125,23 @@ export function DmvService({ config, variant = 'baseline' }) {
       speed.current = 1;
       return { ms: elapsed, settleModelMs: schedule(config.components, variant).settle };
     };
-    window.__benchfirst = { profile, runInteraction };
+    // Ruler calibration: run the identical path with zero model time → elapsed ≈ fixed harness overhead.
+    const overhead = async () => {
+      calibrateRef.current = true;
+      speed.current = SPEED_BENCH;
+      const t0 = performance.now();
+      await runRef.current();
+      const elapsed = performance.now() - t0;
+      speed.current = 1;
+      calibrateRef.current = false;
+      return elapsed;
+    };
+    // Flow-correctness: after a run settles, did the DMV flow still work? (the fired-metric guard)
+    const correctness = () =>
+      config.invariants
+        ? config.invariants({ resolved: resolvedRef.current, running: runningRef.current, phase: phaseRef.current })
+        : { ok: true, checks: [] };
+    window.__benchfirst = { profile, runInteraction, overhead, correctness };
     window.__runInteraction = runInteraction; // back-compat with bench/harness.mjs
     window.__ready = true;
     return () => { window.__ready = false; clearTimers(); };

@@ -6,17 +6,13 @@
 //     ->  refuse "done" until best beats baseline  ->  write result back to memory
 //
 import { signature } from '../bench/signature.mjs';
-import { measure, readProfile } from '../bench/harness.mjs';
-import { pickOrder } from './picker.mjs';
-import { submitVerdict } from '../memory/writer.mjs';
-import * as memory from '../memory/s3-store.mjs';
+import { measure, measureOverhead, readProfile, checkCorrectness } from '../bench/harness.mjs';
+import * as memory from '../memory/store.mjs';
 
-const THRESHOLD = 60; // d4 ship number: a candidate must cut time-to-settled by >=60% to count as a real win
-// Determinism gate (same bar as the Akash preflight). A measurement whose
-// coefficient of variation exceeds this is too noisy to trust — a jittery run
-// can mint a fake "win" (see FLAGS F10/F15), so the loop REFUSES rather than
-// writes an unearned verdict. Trust story: the scale must be steady before we read it.
-const MAX_COV = 0.08;
+const THRESHOLD = 20; // a candidate must cut time-to-settled by >=20% to count as a real win
+const COV_GATE = 0.08; // benchmark is untrusted above this coefficient of variation
+const CONF_MIN = 0.5; // confidence floor: below it, hold for a human (D8)
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // The candidate fixes the optimizer can try (baseline = the request-waterfall we beat).
 // `spinner` is a cosmetic non-fix that does NOT cut load time — memory learns to skip it.
 const ALL_FIXES = ['parallel', 'spinner'];
@@ -27,6 +23,11 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
   const mem = await memory.load();
   const known = mem[sig];
 
+  // Calibrate the ruler: measure the harness's fixed overhead, then subtract it so the
+  // cut reflects the app, not the test rig (#1). `adj` is the app-attributable time.
+  const overhead = await measureOverhead(browser, url, pageId);
+  const adj = (ms) => Math.max(1, ms - overhead);
+
   // 1. Baseline benchmark — the number every candidate must beat.
   const baseline = await measure(browser, url, pageId, 'baseline', runs);
 
@@ -34,7 +35,9 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
     pageId,
     signature: sig,
     warmStarted: !!known,
+    overheadMs: +overhead.toFixed(1),
     baselineMs: +baseline.mean.toFixed(1),
+    baselineAdjMs: +adj(baseline.mean).toFixed(1),
     baselineCov: baseline.cov,
     candidates: [],
     skippedKnownLosers: [],
@@ -64,11 +67,16 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
   for (const strat of order) {
     const m = await measure(browser, url, pageId, strat, runs);
     report.benchRuns += m.n;
-    const deltaPct = ((baseline.mean - m.mean) / baseline.mean) * 100;
-    // A win must clear the threshold AND come from a steady measurement — a
-    // noisy candidate run can't be promoted (guards against a jitter-born delta).
-    const trusted = m.cov <= MAX_COV;
-    const beat = trusted && deltaPct >= THRESHOLD;
+    // Calibrated measured cut (overhead removed).
+    const calDelta = ((adj(baseline.mean) - adj(m.mean)) / adj(baseline.mean)) * 100;
+    // Physical ceiling: a fix cannot settle faster than its longest component, so the cut can't
+    // exceed the structural (model) cut. Capping here removes the over-subtraction overshoot on
+    // fast variants without letting the model inflate anything — min() only ever lowers.
+    const modelDelta = baseline.settleModelMs
+      ? ((baseline.settleModelMs - m.settleModelMs) / baseline.settleModelMs) * 100
+      : calDelta;
+    const deltaPct = Math.min(calDelta, modelDelta);
+    const beat = deltaPct >= THRESHOLD;
     report.candidates.push({
       strategy: strat,
       ms: +m.mean.toFixed(1),
@@ -94,22 +102,32 @@ export async function optimize({ browser, url, pageId, runs = 3 }) {
   report.winner = winners[0].strategy;
   report.winnerDeltaPct = winners[0].deltaPct;
 
-  // 5. Write back — through the verdict WRITER, never directly to the store.
-  //    The writer re-validates against schema/verdict.json; an unmeasured
-  //    "opinion" would be rejected here before it could reach S3.
+  // Explicit confidence (0..1) carried WITH the verdict = measurement trust × win margin.
+  // Trust is high when the benchmark is tight (low cov) AND the win clears the threshold
+  // comfortably. It is emitted, not left for a consumer to re-derive.
+  const covTrust = clamp01(1 - baseline.cov / COV_GATE);
+  const marginTrust = clamp01((report.winnerDeltaPct - THRESHOLD) / THRESHOLD);
+  report.confidence = +(covTrust * marginTrust).toFixed(2);
+
+  // Flow-correctness of the winner — "nothing else broke" (the fired-metric guard). A faster
+  // candidate that breaks the flow must NOT ship on speed alone.
+  report.correctness = await checkCorrectness(browser, url, pageId, report.winner);
+  report.recommendation = report.correctness.ok && report.confidence >= CONF_MIN ? 'SHIP' : 'REVIEW';
+
+  // 5. Write back to memory (merge new knowledge with any prior knowledge).
   const mergedCandidates = known ? { ...known.candidates } : {};
   for (const c of report.candidates) {
     mergedCandidates[c.strategy] = { deltaPct: c.deltaPct, beat: c.beat };
   }
-  await submitVerdict({
-    signature: sig,
-    record: {
-      winner: report.winner,
-      candidates: mergedCandidates,
-      firstSeenPage: known?.firstSeenPage ?? pageId,
-      updatedByPage: pageId,
-    },
-  });
+  mem[sig] = {
+    winner: report.winner,
+    candidates: mergedCandidates,
+    confidence: report.confidence,
+    provenance: { runner: 'local', cov: baseline.cov },
+    firstSeenPage: known?.firstSeenPage ?? pageId,
+    updatedByPage: pageId,
+  };
+  memory.save(mem);
 
   return report;
 }

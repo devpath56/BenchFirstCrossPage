@@ -45,6 +45,19 @@ const config = {
     sub: 'We couldn’t match that plate and VIN. Check your entries and try again.',
   },
   error: { msg: 'We couldn’t reach the registration system. Please try again.' },
+  // Flow-correctness invariants — "nothing else broke" after a fix (the fired-metric guard).
+  invariants: ({ resolved, running }) => {
+    const need = 7; // vehicle + 5 fees + pay
+    const allRendered = resolved.size >= need;
+    const totalOk = running === TOTAL;
+    return {
+      ok: allRendered && totalOk,
+      checks: [
+        { name: 'all fees & summary rendered', pass: allRendered, detail: `${resolved.size}/${need} components` },
+        { name: 'Amount Due correct', pass: totalOk, detail: `$${running} (expected $${TOTAL})` },
+      ],
+    };
+  },
   renderStage: ({ resolved, running, inputs }) => (
     <>
       {resolved.has('vehicle') ? (

@@ -37,6 +37,19 @@ const config = {
     sub: 'Try a different city or ZIP code.',
   },
   error: { msg: 'We couldn’t reach the appointment service. Please try again.' },
+  // Flow-correctness invariants — "nothing else broke" after a fix (the fired-metric guard).
+  invariants: ({ resolved }) => {
+    const cards = ['card0', 'card1', 'card2'].every((id) => resolved.has(id));
+    const map = resolved.has('map');
+    const header = resolved.has('header');
+    return {
+      ok: header && cards && map,
+      checks: [
+        { name: '3 office cards rendered', pass: cards, detail: cards ? 'all present' : 'missing card(s)' },
+        { name: 'map (long pole) rendered', pass: map, detail: map ? 'loaded' : 'missing' },
+      ],
+    };
+  },
   renderStage: ({ resolved, inputs }) => (
     <>
       {resolved.has('header') ? (
