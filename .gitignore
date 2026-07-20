@@ -9,3 +9,4 @@ dist/
 !.env.example
 pomerium/signing-key.pem
 *.pem
+pomerium/config.rendered.yaml

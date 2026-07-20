@@ -1,0 +1,8 @@
+HTTP/1.1 403 Forbidden
+content-type: application/json
+Date: Mon, 20 Jul 2026 05:01:42 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+{"error":"caller identity \"attacker@evil.example\" is not the verdict-runner"}

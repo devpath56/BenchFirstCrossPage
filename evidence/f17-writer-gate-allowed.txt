@@ -1,0 +1,8 @@
+HTTP/1.1 200 OK
+content-type: application/json
+Date: Mon, 20 Jul 2026 05:01:28 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+{"ok":true,"signature":"waterfall-load","store":"local:/app/memory/memory.json"}
