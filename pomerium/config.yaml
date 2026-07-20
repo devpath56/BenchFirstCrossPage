@@ -27,6 +27,16 @@ shared_secret: ${POMERIUM_SHARED_SECRET}
 #   openssl ecparam -genkey -name prime256v1 -noout -out ec_private.pem
 signing_key_file: /pomerium/signing-key.pem
 
+# GLOBAL identity-claim header (F17). `pass_identity_headers: true` alone makes
+# Pomerium v0.28.0 inject ONLY x-pomerium-jwt-assertion (a signed JWT) — NOT the
+# plain x-pomerium-claim-email header that memory/writer.mjs compares against.
+# This global map materialises the email claim as that header. Verified against
+# v0.28.0 on an echo upstream: with this set, the writer receives
+#   X-Pomerium-Claim-Email: <verdict-runner email>
+# Must be GLOBAL and a MAP ({header: claim}); v0.28.0 rejects it at route scope.
+jwt_claims_headers:
+  x-pomerium-claim-email: email
+
 # ── Identity provider ────────────────────────────────────────────────────────
 # The verdict-runner authenticates here. For a machine caller, a service account
 # from the same IdP is cleanest (a single, non-human identity that owns writes).
@@ -43,10 +53,12 @@ routes:
   - from: https://verdict.${BENCHFIRST_DOMAIN}
     to: http://writer:8787            # internal upstream (i5 container/service name)
     name: verdict-writer
-    # Injects the verified identity upstream. i7: confirm the pinned Pomerium
-    # version emits x-pomerium-claim-email (the header writer.mjs reads); newer
-    # versions may require `jwt_claims_headers: [email]` instead — verify against
-    # an echo upstream before trusting the gated path.
+    # Injects the verified identity upstream (as x-pomerium-jwt-assertion). The
+    # plain x-pomerium-claim-email header that writer.mjs reads comes from the
+    # GLOBAL jwt_claims_headers map above — NOT from a route-level option.
+    # (v0.28.0 rejects a route-level `jwt_claims_headers` — and the list form
+    # `[email]` — as "unknown config option"; confirmed empirically on an echo
+    # upstream.)
     pass_identity_headers: true
     # Method-level restriction (POST /verdict) stays the writer's job: it already
     # 405s anything else. Path prefixes here scope which routes exist at all.

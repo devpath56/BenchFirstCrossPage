@@ -1,0 +1,9 @@
+# F17 pair test (MOCK OIDC IdP) — CASE: wrong identity
+# Mock issued email = attacker@evil.example (!= BENCHFIRST_VERDICT_IDENTITY)
+# Authenticated as attacker, then POST /verdict.
+
+HTTP/2 403  (Pomerium policy denied before reaching writer)
+
+-- Pomerium authorize decision (POST /verdict) --
+  email=attacker@evil.example,"allow":false,"allow-why-false":["email-unauthorized"]
+  allow=false  allow-why-false=[email-unauthorized]

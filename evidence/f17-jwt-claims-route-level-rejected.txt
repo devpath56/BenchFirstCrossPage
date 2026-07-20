@@ -1,0 +1,1 @@
+# Pomerium v0.28.0 rejects jwt_claims_headers at ROUTE level (list AND map form):

@@ -1,0 +1,18 @@
+===== BODY (whoami reflects the headers it received from Pomerium) =====
+Hostname: 150ca390b799
+IP: 127.0.0.1
+IP: ::1
+IP: 172.18.0.2
+RemoteAddr: 172.18.0.4:36428
+GET /verdict HTTP/1.1
+Host: f17-whoami:80
+User-Agent: f17-probe
+Accept: */*
+Cookie: 
+X-Envoy-Expected-Rq-Timeout-Ms: 30000
+X-Envoy-Internal: true
+X-Forwarded-For: 172.18.0.5
+X-Forwarded-Proto: https
+X-Pomerium-Jwt-Assertion: eyJhbGciOiJFUzI1NiIsImtpZCI6ImVjNjIzM2U4NTkwMDE1MTgxYjc1YzJlNGM3NjgyZDI3YzhhMWRhM2EyNWY1OWRkYmRlY2NkNWQyOTQ0OTYxZGMiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJ2ZXJkaWN0LmxvY2FsaG9zdC50ZXN0IiwiZW1haWwiOiJ2ZXJkaWN0LXJ1bm5lckBiZW5jaGZpcnN0LmV4YW1wbGUiLCJleHAiOjE3ODQ1MjU5NzAsImdyb3VwcyI6bnVsbCwiaWF0IjoxNzg0NTI1NjcwLCJpc3MiOiJ2ZXJkaWN0LmxvY2FsaG9zdC50ZXN0IiwianRpIjoiZmFhZDRjYzUtOWFjNi00MGE5LWEwMGItNjI5YTI0ODdmMjcxIiwibmFtZSI6IiIsInNpZCI6IjdjNmM5NTFjLWY2ZmYtNGU1Mi05MjhiLTRhN2RkOTllZTU4NCIsInN1YiI6InZlcmRpY3QtcnVubmVyIiwidXNlciI6InZlcmRpY3QtcnVubmVyIn0.0jWt1r_xqyCMAyzdu2gRiiW-XHrDn9npq-V-4SOPyYPbKBsLeUudQC09R2iJPP-UsLaF8DmVL-6weghgcO3pZw
+X-Request-Id: 078318c2-e22e-46b5-926a-39e856918398
+

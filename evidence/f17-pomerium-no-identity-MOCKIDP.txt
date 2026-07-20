@@ -1,0 +1,8 @@
+# F17 pair test (MOCK OIDC IdP) — CASE: no identity (machine/API caller)
+# POST /verdict through Pomerium, NO session cookie, Accept: application/json
+
+HTTP/2 401 
+
+-- body --
+{"error":"Unauthorized","request_id":"fe60b877-846f-4cf6-8d08-84eed01e32fa"}
+-- note: browser-style (Accept: */*) yields 302 redirect to login; both block before the writer --

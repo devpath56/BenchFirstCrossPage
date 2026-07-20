@@ -1,0 +1,9 @@
+# F17 pair test (MOCK OIDC IdP) — CASE: correct identity
+# Mock issued email = ishamishra0408@gmail.com (== BENCHFIRST_VERDICT_IDENTITY)
+# Full SSO login through Pomerium, then POST /verdict with the session.
+
+HTTP/2 200 
+content-type: application/json
+
+-- writer response body (200 => gate matched => X-Pomerium-Claim-Email reached writer) --
+{"ok":true,"signature":"waterfall-load","store":"local:/app/memory/memory.json"}
