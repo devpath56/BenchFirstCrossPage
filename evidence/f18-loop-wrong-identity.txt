@@ -1,0 +1,9 @@
+
+> benchfirst-crosspage@0.1.0 demo
+> node scripts/demo.mjs
+
+Error: writer rejected verdict (403): caller identity "attacker@evil.example" is not the verdict-runner
+    at submitVerdict (file:///Users/ishamishra/Desktop/BenchFirstCrossPage/memory/writer.mjs:77:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async optimize (file:///Users/ishamishra/Desktop/BenchFirstCrossPage/optimizer/loop.mjs:133:3)
+    at async main (file:///Users/ishamishra/Desktop/BenchFirstCrossPage/scripts/demo.mjs:98:15)

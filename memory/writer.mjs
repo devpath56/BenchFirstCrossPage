@@ -58,9 +58,19 @@ export async function writeVerdict(verdict) {
 export async function submitVerdict(verdict) {
   const url = process.env.BENCHFIRST_WRITER_URL;
   if (!url) return writeVerdict(verdict);
+  const headers = { 'content-type': 'application/json' };
+  // Identity the writer's gate checks against. In the full topology Pomerium
+  // injects this header after an OIDC login and overwrites any client copy, so
+  // it is proof. With Pomerium absent on this lease the caller self-asserts it,
+  // so here the header is convenience, not proof. Send it only when we have a
+  // caller identity; unset → send nothing and let the writer 403. Never fall
+  // back to BENCHFIRST_VERDICT_IDENTITY: that is the server's expected value,
+  // and reading it here would let the client trivially match the gate.
+  const caller = process.env.BENCHFIRST_CALLER_IDENTITY;
+  if (caller) headers[IDENTITY_HEADER] = caller;
   const res = await fetch(`${url.replace(/\/$/, '')}/verdict`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify(verdict),
   });
   const body = await res.json();
