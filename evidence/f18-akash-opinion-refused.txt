@@ -1,0 +1,11 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   178    0    65  100   113   1925   3347 --:--:-- --:--:-- --:--:--  5393
+HTTP/1.1 403 Forbidden
+Server: nginx
+Date: Tue, 21 Jul 2026 02:30:16 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+
+{"error":"caller identity \"(none)\" is not the verdict-runner"}
