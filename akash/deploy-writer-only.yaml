@@ -1,0 +1,67 @@
+---
+# akash/deploy-writer-only.yaml — WRITER-ONLY variant for the Akash lease.
+#
+# This is NOT the intended full topology. The full design (writer fronted by
+# Pomerium, writer reachable ONLY from pomerium) lives in akash/deploy.yaml and
+# is what the pitch references. Pomerium is DROPPED from this lease because Akash
+# has no bind mounts and passing Pomerium's full rendered config + secrets as env
+# vars is out of scope tonight.
+#
+# SECURITY NOTE — read before trusting anything on this lease:
+#   With Pomerium absent, NOTHING verifies the x-pomerium-claim-email header. The
+#   writer's identity gate still runs (fail-closed if BENCHFIRST_VERDICT_IDENTITY
+#   is set), but any caller can trivially set that header themselves — there is no
+#   trusted proxy injecting it. On THIS lease the gate is DEMONSTRATIVE, not a
+#   security boundary. The Pomerium-in-front enforcement is proven separately and
+#   locally (see evidence/f17-pomerium-*-MOCKIDP.txt); that remains the claim for
+#   the full topology, not for this writer-only deployment.
+#
+# The writer is exposed globally here so the provider-assigned hostname can reach
+# it directly (no Pomerium ingress). verdict.benchfirst.example is a placeholder
+# domain we do not own, so there is no `accept:` block — the provider assigns a
+# generated hostname.
+version: "2.0"
+
+services:
+  writer:
+    image: ishamishra0408/benchfirst-writer:v1
+    env:
+      # PLACEHOLDER_* values are filled in the Akash console at deploy time — real
+      # secrets are NEVER written to this file. Non-secret values (region/bucket/key)
+      # are safe to declare here.
+      - AWS_ACCESS_KEY_ID=PLACEHOLDER_WRITER_KEY          # scoped s3:PutObject only
+      - AWS_SECRET_ACCESS_KEY=PLACEHOLDER_WRITER_SECRET   # scoped s3:PutObject only
+      - AWS_REGION=us-west-2
+      - BENCHFIRST_S3_BUCKET=benchfirst-scar-isha-loophack
+      - BENCHFIRST_S3_KEY=benchfirst/memory.json
+      - BENCHFIRST_WRITER_HOST=0.0.0.0
+      - BENCHFIRST_WRITER_PORT=8787
+      - BENCHFIRST_VERDICT_IDENTITY=PLACEHOLDER_VERDICT_EMAIL   # backstop ON, but unverifiable without Pomerium
+    expose:
+      - port: 8787
+        as: 80
+        to:
+          - global: true
+
+profiles:
+  compute:
+    writer:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 256Mi
+        storage:
+          size: 512Mi
+  placement:
+    dcloud:
+      pricing:
+        writer:
+          denom: uakt
+          amount: 10000
+
+deployment:
+  writer:
+    dcloud:
+      profile: writer
+      count: 1

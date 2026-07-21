@@ -1,0 +1,8 @@
+HTTP/1.1 403 Forbidden
+Server: nginx
+Date: Tue, 21 Jul 2026 02:01:22 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+
+{"error":"caller identity \"(none)\" is not the verdict-runner"}
