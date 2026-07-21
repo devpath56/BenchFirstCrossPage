@@ -15,12 +15,17 @@ services:
   writer:
     image: ishamishra0408/benchfirst-writer:v1   # i7: docker push this tag first
     env:
+      # PLACEHOLDER_* values are filled in the Akash console at deploy time — real
+      # secrets are NEVER written to this file. Non-secret values (region/bucket/key)
+      # are safe to declare here.
+      - AWS_ACCESS_KEY_ID=PLACEHOLDER_WRITER_KEY          # scoped s3:PutObject only
+      - AWS_SECRET_ACCESS_KEY=PLACEHOLDER_WRITER_SECRET   # scoped s3:PutObject only
+      - AWS_REGION=us-west-2
+      - BENCHFIRST_S3_BUCKET=benchfirst-scar-isha-loophack
+      - BENCHFIRST_S3_KEY=benchfirst/memory.json
       - BENCHFIRST_WRITER_HOST=0.0.0.0
       - BENCHFIRST_WRITER_PORT=8787
-      # i7 (secrets, set via CLI/console — not in this file):
-      # - BENCHFIRST_S3_BUCKET=...
-      # - BENCHFIRST_VERDICT_IDENTITY=verdict-runner@...   # backstop ON, fail-closed
-      # - AWS_ACCESS_KEY_ID=... / AWS_SECRET_ACCESS_KEY=... # scoped s3:PutObject only
+      - BENCHFIRST_VERDICT_IDENTITY=PLACEHOLDER_VERDICT_EMAIL   # backstop ON, fail-closed
     expose:
       - port: 8787
         to:

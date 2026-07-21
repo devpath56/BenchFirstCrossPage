@@ -10,3 +10,4 @@ dist/
 pomerium/signing-key.pem
 *.pem
 pomerium/config.rendered.yaml
+memory/memory.json
