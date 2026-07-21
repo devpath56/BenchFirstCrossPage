@@ -49,5 +49,19 @@ export async function save(mem) {
 }
 
 export async function reset() {
+  // No bucket -> local reset, unchanged. Wiping a local file is cheap and private.
+  if (!BUCKET()) return save({});
+  // Bucket set -> the scar file is SHARED (deployed writer + teammates). An
+  // accidental `npm run demo` must NOT silently destroy it. Require an explicit
+  // opt-in and THROW loudly otherwise — no warn-and-continue, no skip-and-fallback:
+  // a skipped reset would let load() return the existing verdict, Page A would
+  // start WARM instead of COLD, and the demo would print a plausible but wrong run.
+  if (process.env.BENCHFIRST_ALLOW_RESET !== '1') {
+    throw new Error(
+      `Refusing to reset shared S3 scar state at s3://${BUCKET()}/${KEY()} — ` +
+      `this would wipe verdicts written by the deployed Akash writer and teammates. ` +
+      `Set BENCHFIRST_ALLOW_RESET=1 to explicitly wipe shared S3 state.`
+    );
+  }
   return save({});
 }
